@@ -1,0 +1,409 @@
+<html>
+<header><title>micahl.com</title>
+  <script src="https://unpkg.com/react@16/umd/react.development.js"></script>
+      <script src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+      <!-- Don't use this in production: -->
+      <script src="https://unpkg.com/babel-standalone@6.15.0/babel.min.js"></script>
+       <script src="https://unpkg.com/react-router-dom/umd/react-router-dom.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/aws-sdk/2.349.0/aws-sdk.js">    </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/redux/4.0.1/redux.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-redux/5.1.0/react-redux.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/redux-thunk/2.3.0/redux-thunk.js"></script>
+<body>
+<div id="root">
+</div>
+
+<script type="text/babel">
+
+var uploadSuccessful = true;
+
+//--Action creators--
+
+const advanceBallot = () => ({
+  type: "ADVANCE_BALLOT",
+});
+
+const attemptBallotSubmission = () => ({
+  type: "ATTEMPT_BALLOT_SUBMISSION"
+});
+const confirmBallotSubmission = () => ({
+  type: "CONFIRM_BALLOT_SUBMISSION"
+});
+const failBallotSubmission = () => ({
+  type: "FAIL_BALLOT_SUBMISSION"
+});
+const requestMoreBallots = () => ({
+  type: 'REQUEST_MORE_BALLOTS',
+  count: 10
+});
+const receiveMoreBallots = (ballots) => ({
+  type: 'RECEIVE_MORE_BALLOTS',
+  ballots: ballots
+});
+const failReceiveMoreBallots = () => ({
+  type: 'FAIL_RECEIVE_MORE_BALLOTS',
+});
+const submitBallotAndAdvance = (winnerPlace, loserPlace) => {
+  return (dispatch, getState) => {
+    dispatch(attemptBallotSubmission());
+    //TODO: Needs tons more validation server side.
+    //TODO: Should not let people pick winner and loser. Only VOTE for winner.
+    var state = getState();
+    var winnerID = state.ballots.items[0][winnerPlace];
+    var loserID = state.ballots.items[0][loserPlace];
+    console.log("winnerID " + winnerID);
+    console.log("loserID " + loserID);
+    dispatch(advanceBallotAndFetchMoreIfNeeded());
+    return axios({
+        method: 'put',
+        url: "https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/ballots/",
+        data: JSON.stringify({"WinnerID" : winnerID, "LoserID" : loserID}),
+        headers: {"Content-Type": "application/json"}
+      }
+    )
+    .then(function (response) {
+      console.log("Ballot submission successful");
+      dispatch(confirmBallotSubmission());
+    }, function (error) {
+      console.log(error);
+      dispatch(failBallotSubmission());
+    });
+  }
+}
+const advanceBallotAndFetchMoreIfNeeded = () => {
+  return (dispatch, getState) => {
+      dispatch(advanceBallot());
+      dispatch(fetchMoreBallotsIfNeeded(getState()));
+  };
+};
+
+function checkNested(obj /*, level1, level2, ... levelN*/) {
+  var args = Array.prototype.slice.call(arguments, 1);
+
+  for (var i = 0; i < args.length; i++) {
+    if (!obj || !obj.hasOwnProperty(args[i])) {
+      return false;
+    }
+    obj = obj[args[i]];
+  }
+  return true;
+}
+
+const fetchMoreBallots = (count) => {
+  return function(dispatch, getState) {
+    return axios
+      .get(
+          "https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/ballots?count=" + parseInt(count)
+      )
+      .then(function (response) {
+        var newBallots = response.data;
+        return dispatch(receiveMoreBallots(newBallots));
+      }, function (error) {
+        console.log(error);
+        return dispatch(failReceiveMoreBallots());
+      });
+  }};
+
+
+const shouldFetchMoreBallots= (state) => {
+      if (checkNested(state, "ballots", "items")) {
+        return state.ballots.items.length < 5
+      } else {
+        return true;
+      }
+}
+const fetchMoreBallotsIfNeeded = () => {
+  return (dispatch, getState) => {
+    if (shouldFetchMoreBallots(getState())) {
+      return dispatch(fetchMoreBallots(10));
+    } else {
+      return Promise.resolve();
+    }
+  }
+}
+
+const requestLatestAnimals= () => ({
+  type: "REQUEST_LATEST_ANIMALS",
+})
+const receiveLatestAnimals = (animals) => ({
+  type: "RECEIVE_LATEST_ANIMALS",
+  animals: animals
+})
+const failReceiveLatestAnimals = () => ({
+  type: "FAIL_RECEIVE_LATEST_ANIMALS",
+})
+
+const fetchLatestAnimals = () => {
+  return (dispatch, getState) => {
+      dispatch(requestLatestAnimals);
+      return axios.get('https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/animals')
+      .then(function (response) {
+          var dynamoDBAnimals = response.data.body.Item;
+          var allAnimalsGoofy = AWS.DynamoDB.Converter.unmarshall(dynamoDBAnimals);
+          var allAnimals = allAnimalsGoofy.Animals;
+          dispatch(receiveLatestAnimals(allAnimals));
+        }, function (error){
+          console.error(error);
+          dispatch(updateToLatestAnimalsFailure());
+        });
+      };
+};
+const shouldFetchLatestAnimals = (state) => {
+  //TODO: Add refresh based on time
+    if (Object.keys(state.animals.items).length == 0) {
+      return true;
+    } else {
+      return false;
+    }
+}
+const fetchLatestAnimalsIfNeeded = () => {
+  return (dispatch, getState) => {
+    if (shouldFetchLatestAnimals(store.getState())) {
+      return dispatch(fetchLatestAnimals());
+    } else {
+      return Promise.resolve();
+    }
+  }
+};
+
+
+
+//--Reducers--
+//animals
+//--isFetching = false
+//--didInvalidate = false
+//--items = {{3}: {name: moose, wins: 25, losses: 8}}
+//ballots
+//--isFetching = false
+//--didInvalidate = false
+//--items
+//----[[animal_1:{5}, animal_2:{2}]*]
+
+function rankAnimals(animalsMap) {
+    var animalKeys = Object.keys(animalsMap);
+    var animals = [];
+    for (let animalKey of animalKeys) {
+      var animal = animalsMap[animalKey];
+      animal.ID = animalKey;
+      animals.push(animal);
+    }
+    var result = animals.sort(function (a, b) {
+      var ratio_animal_a = (a.Wins + 1) / (a.Losses + 1);
+      var ratio_animal_b = (b.Wins + 1) / (b.Losses + 1);
+      if (ratio_animal_a == ratio_animal_b) {
+        var alphabeticalOrder = [a.Name, b.Name].sort();
+        if (alphabeticalOrder[0] == a.Name) {
+          return -1;
+        } else {
+          return 1;
+        }
+      } else {
+        if (ratio_animal_b > ratio_animal_a) {
+          return 1;
+        } else if (ratio_animal_b < ratio_animal_a) {
+          return -1;
+        } else {
+          return 0;
+        }
+      }
+    });
+    var animalsIDSorted = animals.map(function(animal) {return animal.ID});
+    return animalsIDSorted;
+}
+
+function animals(state = {
+  isFetching: false,
+  didInvalidate: false,
+  items: {},
+  rankOrder: [],
+  }, action
+  ) {
+  switch (action.type) {
+    case 'REQUEST_LATEST_ANIMALS':
+      return Object.assign({}, state, {
+        isFetching: true,
+        didInvalidate: false
+      });
+    case 'RECEIVE_LATEST_ANIMALS':
+      var result =  Object.assign({}, state, {
+        isFetching: false,
+        didInvalidate: false,
+        items: action.animals,
+        rankOrder: rankAnimals(action.animals),
+        lastUpdated: action.receivedAt});
+      return result;
+    default:
+      return state;
+  }
+}
+
+function ballots(state = {
+  isFetching: false,
+  didInvalidate: false,
+  items: []
+  }, action) {
+  switch (action.type) {
+    case 'ADVANCE_BALLOT':
+      return Object.assign({}, state, {
+        items: state.items.slice(1),
+        lastUpdated: action.receivedAt
+    });
+    case 'REQUEST_MORE_BALLOTS':
+      return Object.assign({}, state, {
+        isFetching: true,
+        didInvalidate: false
+      });
+    case 'RECEIVE_MORE_BALLOTS':
+      return Object.assign({}, state, {
+        isFetching: false,
+        didInvalidate: false,
+        items: state.items.concat(action.ballots),
+        lastUpdated: action.receivedAt
+      });
+    default:
+      return state;
+  }
+}
+
+const rootReducer = Redux.combineReducers({
+  "animals": animals,
+  "ballots": ballots
+})
+
+//--Store--
+
+function createThunkMiddleware(extraArgument) {
+	  return function (_ref) {
+	    var dispatch = _ref.dispatch,
+	        getState = _ref.getState;
+	    return function (next) {
+	      return function (action) {
+	        if (typeof action === 'function') {
+	          return action(dispatch, getState, extraArgument);
+	        }
+
+	        return next(action);
+	      };
+	    };
+	  };
+	}
+const store = Redux.createStore(rootReducer, Redux.applyMiddleware(createThunkMiddleware()));
+
+//--Stuff--
+const Router = window.ReactRouterDOM.BrowserRouter;
+const Route =  window.ReactRouterDOM.Route;
+const Link =  window.ReactRouterDOM.Link;
+const Prompt =  window.ReactRouterDOM.Prompt;
+const Switch = window.ReactRouterDOM.Switch;
+const Redirect = window.ReactRouterDOM.Redirect;
+
+class App extends React.Component {
+  render() {
+      return <Router><div><p>Both Are Totally Enraged</p><ul><li><Link to="battle">Battle</Link></li><li><Link to="animals">Rankings</Link></li></ul><Route path="/battle" component={BallotViewer_Logic} /><Route path="/animals" component={Animals_Logic} /></div></Router>;
+  }
+}
+
+//--Presentational Components--
+class Animals extends React.Component {
+  render () {
+    const animals = this.props.animals.items;
+    const rankOrder = this.props.animals.rankOrder;
+    if (animals != null) {
+      var animalsHTML = [];
+      for (var i = 0; i < rankOrder.length; i++) {
+        var animalKey = rankOrder[i]
+        animalsHTML.push(<AnimalListing key={i} name={animals[animalKey].Name} rank={i+1} id={animalKey}></AnimalListing>);
+      }
+      return <div> {animalsHTML}
+            <Switch>
+            <Route path='/animals/:rank' component={Animal}/>
+            </Switch>
+            </div>;
+      } else {
+  return <div>Loading...</div>
+    }
+  }
+}
+class BallotViewer extends React.Component {
+  render() {
+    if (this.props.animal_1 == null || this.props.animal_2 == null) {
+      return "Loading...";
+    } else {
+      return <div><div onClick={this.props.onBallotClick(0, 1)}>{this.props.animal_1.Name}</div> vs. <div onClick={this.props.onBallotClick(1, 0)}>{this.props.animal_2.Name}</div></div>;
+    }
+  }
+}
+class AnimalListing extends React.Component {
+  render () {
+    return <div><Link to={"/animals/" + this.props.rank}>{this.props.rank} - {this.props.name}</Link></div>;
+  }
+}
+class Animal extends React.Component {
+
+  render () {
+    return <div><Link to="/animals">Back to rankings</Link><div>{this.props.name} is ranked: {this.props.match.params.rank}</div></div>
+  }
+}
+
+//--Logical Components--
+
+const animals_mapStateToProps = (state) => {
+  return {
+    animals: state.animals
+  }
+};
+const Animals_Logic = ReactRedux.connect(animals_mapStateToProps)(Animals);
+
+function getCurrentBallotAnimal(firstOrSecond) {
+  var state = store.getState();
+  var ballotExists = checkNested(state, "ballots", "items");
+  var animalsExists = checkNested(state, "animals", "items");
+  if (! ballotExists || !animalsExists) {
+    return null;
+  }
+  var currentBallot = state.ballots.items[0];
+  var animalID = currentBallot[firstOrSecond - 1];
+  var animal = state.animals.items[animalID];
+  return animal;
+}
+
+const ballotViewer_mapStateToProps = state => {return {
+    ballots: state.ballots,
+    animal_1: getCurrentBallotAnimal(1),
+    animal_2: getCurrentBallotAnimal(2)
+  }};
+const ballotViewer_mapDispatchToProps = (dispatch) => {
+  return {
+    onBallotClick: (winnerPlace, loserPlace) => {return () => {
+        dispatch(submitBallotAndAdvance(winnerPlace, loserPlace));
+      }
+    }
+  }
+};
+const BallotViewer_Logic = ReactRedux.connect(
+  ballotViewer_mapStateToProps,
+  ballotViewer_mapDispatchToProps
+)(BallotViewer);
+
+const animal_mapStateToProps = (state, ownProps) => {return {
+  name: state.animals[ownProps.id].name,
+  rank: ownProps.id
+}};
+const Animal_Logic = ReactRedux.connect (animal_mapStateToProps)(Animal);
+
+const animalListing_mapStateToProps = (state, ownProps) => { return {
+    name: state.animals[ownProps.id].name,
+    rank: ownProps.id
+}};
+const AnimalListing_Logic = ReactRedux.connect (animalListing_mapStateToProps)(AnimalListing);
+// To render the Button component to the browser
+ReactDOM.render(
+  <ReactRedux.Provider store={store}>
+    <App/>
+    </ReactRedux.Provider>, document.getElementById('root'));
+store.dispatch(fetchLatestAnimalsIfNeeded());
+store.dispatch(fetchMoreBallotsIfNeeded());
+</script>
+</body>
+</html>
