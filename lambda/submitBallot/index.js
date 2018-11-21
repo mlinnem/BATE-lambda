@@ -1,5 +1,5 @@
 var AWS = require('aws-sdk');
-// Set the region 
+// Set the region
 AWS.config.update({region: 'US-EAST-1'});
 
 // Create an SQS service object
@@ -55,8 +55,8 @@ var responseBody = {
 
     var response = {
         "statusCode": 200,
-        "headers": {"Access-Control-Allow-Headers": '*',	  
-                      "Access-Control-Allow-Origin": '*', 
+        "headers": {"Access-Control-Allow-Headers": '*',
+                      "Access-Control-Allow-Origin": '*',
                       "Access-Control-Allow-Methods": '*' },
         "body": JSON.stringify(responseBody),
         "isBase64Encoded": false

@@ -16,6 +16,9 @@
 
 <script type="text/babel">
 
+function startup() {
+  store.dispatch(fetchAuthKeyIfNeeded());
+}
 //--Action creators--
 
 const advanceBallot = () => ({
@@ -91,9 +94,10 @@ function checkNested(obj /*, level1, level2, ... levelN*/) {
 const fetchMoreBallots = (count) => {
   return function(dispatch, getState) {
     console.log("In fetch more ballots")
+    var authKey = getState().authkey.key;
     return axios
       .get(
-          "https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/ballots?count=" + parseInt(count)
+          "https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/ballots?count=" + parseInt(count) +"&authkey=" + authKey
       )
       .then(function (response) {
         console.log("Fetch response is");
@@ -128,6 +132,56 @@ const fetchMoreBallotsIfNeeded = () => {
   }
 }
 
+const fetchBallotsAndAnimalsIfNeeded = () => {
+  return function (dispatch, getState) {
+    console.log("Really in 'fetchBallotsAndAnimalsIfNeeded'");
+    store.dispatch(fetchLatestAnimalsIfNeeded());
+    store.dispatch(fetchMoreBallotsIfNeeded());
+  }
+}
+
+
+const fetchAuthKey = (count) => {
+  return function(dispatch, getState) {
+    dispatch(requestAuthKey());
+    return axios
+      .get(
+          "https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/authkey"
+      )
+      .then(function (response) {
+        console.log("Fetch AuthKey response is");
+        console.log(response);
+        var newBallots = response.data;
+        return dispatch(receiveAuthKey(newBallots));
+      }, function (error) {
+        console.log(error);
+        return dispatch(failReceiveAuthKey());
+      });
+  }};
+const shouldFetchAuthKey= (state) => {
+  return state.authKey.key != null;
+}
+const fetchAuthKeyIfNeeded = () => {
+  return (dispatch, getState) => {
+    if (shouldFetchMoreBallots(getState())) {
+      return dispatch(fetchAuthKey());
+    } else {
+      return Promise.resolve();
+    }
+  }
+}
+
+const requestAuthKey= () => ({
+  type: "REQUEST_AUTH_KEY",
+})
+const receiveAuthKey = (authkey) => ({
+  type: "RECEIVE_AUTH_KEY",
+  "authkey": authkey
+})
+const failReceiveAuthKey = () => ({
+  type: "FAIL_RECEIVE_AUTH_KEY",
+})
+
 const requestLatestAnimals= () => ({
   type: "REQUEST_LATEST_ANIMALS",
 })
@@ -142,6 +196,7 @@ const failReceiveLatestAnimals = () => ({
 const fetchLatestAnimals = () => {
   return (dispatch, getState) => {
       dispatch(requestLatestAnimals);
+      console.log("Fetching those animals now");
       return axios.get('https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/animals')
       .then(function (response) {
           var dynamoDBAnimals = response.data.body.Item;
@@ -231,6 +286,7 @@ function animals(state = {
         didInvalidate: false
       });
     case 'RECEIVE_LATEST_ANIMALS':
+    console.log("Setting animals state...");
       var result =  Object.assign({}, state, {
         isFetching: false,
         didInvalidate: false,
@@ -271,9 +327,34 @@ function ballots(state = {
   }
 }
 
+function authkey (state = {
+  isFetching: false,
+  didInvalidate: false,
+  items: []
+  }, action) {
+  switch (action.type) {
+    case 'RECEIVE_AUTH_KEY':
+      action.asyncDispatch(fetchBallotsAndAnimalsIfNeeded());
+      return Object.assign({}, state, {
+        isFetching: false,
+        authKey: action.authKey,
+        lastUpdated: action.receivedAt
+    });
+    case 'REQUEST_AUTH_KEY':
+      return Object.assign({}, state, {
+        isFetching: true,
+        didInvalidate: false
+      });
+      //TODO: Fail state
+    default:
+      return state;
+  }
+}
+
 const rootReducer = Redux.combineReducers({
   "animals": animals,
-  "ballots": ballots
+  "ballots": ballots,
+  "authkey": authkey
 })
 
 //--Store--
@@ -293,7 +374,35 @@ function createThunkMiddleware(extraArgument) {
 	    };
 	  };
 	}
-const store = Redux.createStore(rootReducer, Redux.applyMiddleware(createThunkMiddleware()));
+  // This middleware will just add the property "async dispatch"
+  // to actions with the "async" property set to true
+  const asyncDispatchMiddleware = store => next => action => {
+    let syncActivityFinished = false;
+    let actionQueue = [];
+
+    function flushQueue() {
+      actionQueue.forEach(a => store.dispatch(a)); // flush queue
+      actionQueue = [];
+    }
+
+    function asyncDispatch(asyncAction) {
+      actionQueue = actionQueue.concat([asyncAction]);
+
+      if (syncActivityFinished) {
+        flushQueue();
+      }
+    }
+
+    const actionWithAsyncDispatch =
+      Object.assign({}, action, { asyncDispatch });
+
+    const res = next(actionWithAsyncDispatch);
+    syncActivityFinished = true;
+    flushQueue();
+    return res;
+  };
+
+const store = Redux.createStore(rootReducer, Redux.applyMiddleware(createThunkMiddleware(), asyncDispatchMiddleware));
 
 //--Stuff--
 const Router = window.ReactRouterDOM.BrowserRouter;
@@ -371,6 +480,10 @@ function getCurrentBallotAnimal(firstOrSecond) {
   if (! ballotExists || !animalsExists) {
     return null;
   }
+  console.log("ballots is ");
+  console.log(state.ballots);
+  console.log("Items is");
+  console.log(state.ballots.items);
   var currentBallot = state.ballots.items[0];
   var animalID = currentBallot[firstOrSecond - 1];
   var animal = state.animals.items[animalID];
@@ -411,8 +524,8 @@ ReactDOM.render(
   <ReactRedux.Provider store={store}>
     <App/>
     </ReactRedux.Provider>, document.getElementById('root'));
-store.dispatch(fetchLatestAnimalsIfNeeded());
-store.dispatch(fetchMoreBallotsIfNeeded());
+
+startup();
 </script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 var AWS = require('aws-sdk');
-// Set the region 
+// Set the region
 AWS.config.update({region: 'us-east-1'});
 
 var ddb = new AWS.DynamoDB({apiVersion: '2018-10-01'});
@@ -47,13 +47,13 @@ function addWinTo(animalID, allAnimals) {
     console.log(allAnimals.Item.Animals.M[animalID].M.Wins.N);
     allAnimals.Item.Animals.M[animalID].M.Wins.N = (parseInt(allAnimals.Item.Animals.M[animalID].M.Wins.N) + 1).toString();
     return allAnimals;
-    
+
 }
 
 function addLossTo(animalID, allAnimals) {
    allAnimals.Item.Animals.M[animalID].M.Losses.N = (parseInt(allAnimals.Item.Animals.M[animalID].M.Losses.N) + 1).toString();
    return allAnimals;
-    
+
 }
 
 function getAllAnimals() {
@@ -62,11 +62,11 @@ function getAllAnimals() {
    "ID": {
        //TODO: This should probably be a number? In table.
      S: "0",
-    }, 
-  }, 
+    },
+  },
   TableName: "AllAnimals"
  };
- 
+
  var request = ddb.getItem(get_params);
  var promise = request.promise();
  return promise;

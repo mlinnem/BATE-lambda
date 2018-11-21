@@ -1,5 +1,5 @@
 var AWS = require('aws-sdk');
-// Set the region 
+// Set the region
 var uploadWorked = true;
 
 AWS.config.update({region: 'us-east-1'});
@@ -14,8 +14,8 @@ exports.handler =  (event) => {
     const response = {
         statusCode: 200,
         //TODO: This is dangerous
-        headers: {"Access-Control-Allow-Origin" : "*", 
-        "Access-Control-Allow-Methods" : "*", 
+        headers: {"Access-Control-Allow-Origin" : "*",
+        "Access-Control-Allow-Methods" : "*",
         "Access-Control-Allow-Headers" : "*"},
         body: animals
     };
@@ -29,11 +29,11 @@ function getAnimals() {
   Key: {
    "ID": {
      S: "0",
-    }, 
-  }, 
+    },
+  },
   TableName: "AllAnimals"
  };
- 
+
  var request = ddb.getItem(get_params);
  var promise = request.promise();
  return promise;

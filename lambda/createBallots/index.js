@@ -8,13 +8,17 @@ exports.handler = (event) => {
     //TODO: Limit
     console.log("Here's the event");
     console.log(event);
-    var ballotRequestCount = event["queryStringParameters"]['count'];
+    var authkey = event["queryStringParameters"]['authkey'];
     console.log("Count is ");
   console.log(ballotRequestCount);
-    return getAnimals()
+    return getAnimalsAndSession()
     .then(getAnimalCount)
-    .then((animalCount) => {
+    .then((animalCount_and_session) => {
+        var animalCount = animalCount_and_authkey[0]
+        var session = animalCount_and_session[1];
         var ballots = [];
+
+        var ballotRequestCount = calculateBallotsToProvide(session);
         for (var i=0; i < ballotRequestCount; i++) {
             var animal_1_num = 0;
             var animal_2_num = 0;
@@ -83,7 +87,9 @@ function getAnimals() {
 }
 
 
-function getAnimalCount(animals) {
+function getAnimalCount(animalsAndAuthkey) {
+  var animals = animalsAndAuthkey[0];
+  var authkey = animalsAndAuthkey[1];
   console.log("Animals are");
   console.log(animals);
   var animalMap = animals.Item.Animals.M;
@@ -91,5 +97,28 @@ function getAnimalCount(animals) {
   var count = Object.keys(animalMap).length;
   console.log("count is ");
   console.log(count);
-  return count;
+  return [count, authkey];
+}
+
+function getAnimalsAndSession(authkey) {
+    return Promise.all(getAnimals(), getSession(authkey));
+}
+
+function getSession(authkey) {
+    var get_params = {
+  Key: {
+   "ID": {
+     S: authkey,
+    },
+  },
+  TableName: "AuthKey_To_Ballots"
+ };
+
+ var request = ddb.getItem(get_params);
+ var promise = request.promise();
+ return promise;
+}
+
+function calculateBallotsToProvide(session) {
+  return 15 - session.PendingBallots.length;
 }
