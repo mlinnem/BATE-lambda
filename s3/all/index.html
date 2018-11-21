@@ -1,5 +1,5 @@
 <html>
-<header><title>micahl.com</title>
+<header><title>Both Are Totally Enraged</title>
   <script src="https://unpkg.com/react@16/umd/react.development.js"></script>
       <script src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
       <!-- Don't use this in production: -->
@@ -15,8 +15,6 @@
 </div>
 
 <script type="text/babel">
-
-var uploadSuccessful = true;
 
 //--Action creators--
 
@@ -92,11 +90,14 @@ function checkNested(obj /*, level1, level2, ... levelN*/) {
 
 const fetchMoreBallots = (count) => {
   return function(dispatch, getState) {
+    console.log("In fetch more ballots")
     return axios
       .get(
           "https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/ballots?count=" + parseInt(count)
       )
       .then(function (response) {
+        console.log("Fetch response is");
+        console.log(response);
         var newBallots = response.data;
         return dispatch(receiveMoreBallots(newBallots));
       }, function (error) {
@@ -114,10 +115,14 @@ const shouldFetchMoreBallots= (state) => {
       }
 }
 const fetchMoreBallotsIfNeeded = () => {
+  console.log("Making fetchMoreBallotsIfNeeded");
   return (dispatch, getState) => {
+    console.log("IN fetch more ballots if needed");
     if (shouldFetchMoreBallots(getState())) {
+      console.log("Fetching more ballots");
       return dispatch(fetchMoreBallots(10));
     } else {
+      console.log("Not fetching more ballots");
       return Promise.resolve();
     }
   }
@@ -309,6 +314,8 @@ class Animals extends React.Component {
   render () {
     const animals = this.props.animals.items;
     const rankOrder = this.props.animals.rankOrder;
+    console.log("What's the state of animals?");
+    console.log(animals);
     if (animals != null) {
       var animalsHTML = [];
       for (var i = 0; i < rankOrder.length; i++) {
@@ -327,6 +334,7 @@ class Animals extends React.Component {
 }
 class BallotViewer extends React.Component {
   render() {
+    console.log("Rendering ballot viewer");
     if (this.props.animal_1 == null || this.props.animal_2 == null) {
       return "Loading...";
     } else {
@@ -349,6 +357,7 @@ class Animal extends React.Component {
 //--Logical Components--
 
 const animals_mapStateToProps = (state) => {
+  console.log("Mapping state to props for animals");
   return {
     animals: state.animals
   }
