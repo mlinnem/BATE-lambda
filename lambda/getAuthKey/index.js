@@ -60,7 +60,7 @@ function writeNewAuthKey(id){
 };
  var put_params =
   {
-      "Item" : {
+    "Item" : {
     "AuthKey": id,
     "PendingBallots": []
     },
