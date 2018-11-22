@@ -5,7 +5,7 @@ AWS.config.update({region: 'us-east-1'});
 var ddb = new AWS.DynamoDB({apiVersion: '2018-10-01'});
 
 exports.handler = (event, context, callback) => {
-    //TODO: Change to pull all messages off queue every 10 secon minute.
+    //TODO: Change to pull all messages off queue every 10 seconds or minute.
     console.log("event...");
     console.log(event);
     console.log("record 0...");

@@ -14,14 +14,14 @@ else
   exit 1
 fi
 
-echo "nmp installing...";
-npm install
-if [ $? -eq 0 ]; then
-  echo "done";
-else 
-  echo "npm install failed";
-  exit 1;
-fi
+#echo "npm installing...";
+#npm install
+#if [ $? -eq 0 ]; then
+#  echo "done";
+#else
+#  echo "npm install failed";
+#  exit 1;
+#fi
 
 echo "Checking that aws-cli is installed"
 which aws
@@ -44,7 +44,7 @@ aws lambda update-function-code --function-name $lambda --zip-file fileb://archi
 
 if [ $? -eq 0 ]; then
   echo "!! Upload successful !!"
-else 
+else
   echo "Upload failed"
   echo "If the error was a 400, check that there are no slashes in your lambda name"
   echo "Lambda name = $lambda"
