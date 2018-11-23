@@ -59,22 +59,15 @@ function returnBallots(ballots) {
 
 //--Backend functions--
 
-function writeNewBallotsToSession(newBallots, session) {
-  //TODO: This can maybe occur asynchronously with respect to just returning the ballots to the user.
-  //BUT they have to be written before the user tries to submit the ballot, otherwise backend will think it's bogus.
-    ///var updatedSession =  Object.assign({}, session, {"PendingBallots" : session.PendingBallots.concat(newBallots)});
-    console.log("TOP writeNEwBallotsToSession");
-    session.Item.PendingBallots = session.Item.PendingBallots.concat(newBallots);
-     console.log("UNDER writeNEwBallotsToSession");
+function writeSession(session) {
+      var put_params = {
+        Item: session.Item,
+        TableName: 'AuthKey_To_Ballots'
+      };
 
-    var put_params = {
-      Item: session.Item,
-      TableName: 'AuthKey_To_Ballots'
-    };
-
-    var request = io.put(put_params);
-    var promise = request.promise();
-    return promise;
+      var request = io.put(put_params);
+      var promise = request.promise();
+      return promise;
 }
 
 function getAnimals() {
@@ -92,6 +85,7 @@ function getAnimals() {
  return promise;
 }
 
+//TODO: Shared with other functions. Should maybe be abstracted out.
 function getSession(authkey) {
     console.log("Authkey in session");
     console.log(authkey);
@@ -110,6 +104,16 @@ function getSession(authkey) {
 }
 
 //--Utility functions--
+
+function writeNewBallotsToSession(newBallots, session) {
+  //TODO: This can maybe occur asynchronously with respect to just returning the ballots to the user.
+  //BUT they have to be written before the user tries to submit the ballot, otherwise backend will think it's bogus.
+    ///var updatedSession =  Object.assign({}, session, {"PendingBallots" : session.PendingBallots.concat(newBallots)});
+    console.log("TOP writeNEwBallotsToSession");
+    session.Item.PendingBallots = session.Item.PendingBallots.concat(newBallots);
+     console.log("UNDER writeNEwBallotsToSession");
+     return writeSession(session);
+}
 
 function generateNewBallots(newBallotsNeeded, animalCount) {
         for (var i=0; i < newBallotsNeeded; i++) {
@@ -131,6 +135,9 @@ function generateNewBallots(newBallotsNeeded, animalCount) {
                 animal_2_num = temp;
               }
                var ballot = [animal_1_num, animal_2_num];
+               const uniqueID = getUniqueID();
+               ballot.concat(uniqueID);
+
             newBallots.push(ballot);
         }
         return newBallots;
@@ -158,6 +165,10 @@ function getAnimalCount(animals) {
 
 function logError(error) {
     console.error(error);
+}
+
+function getUniqueID() {
+  return crypto.randomBytes(16).toString('base64');
 }
 
 function printOutput(object) {

@@ -36,7 +36,6 @@ const failBallotSubmission = () => ({
 });
 const requestMoreBallots = () => ({
   type: 'REQUEST_MORE_BALLOTS',
-  count: 10
 });
 const receiveMoreBallots = (ballots) => ({
   type: 'RECEIVE_MORE_BALLOTS',
@@ -53,13 +52,16 @@ const submitBallotAndAdvance = (winnerPlace, loserPlace) => {
     var state = getState();
     var winnerID = state.ballots.items[0][winnerPlace];
     var loserID = state.ballots.items[0][loserPlace];
+    var ballotID = state.ballots.items[0][2]; //TODO: This is jank and should be a proper property, not third item in array.
+    var authKey = state.authkey.key; //TODO: Need some logic if there is no key. Shouldn't happen but could maybe.
+
     console.log("winnerID " + winnerID);
     console.log("loserID " + loserID);
     dispatch(advanceBallotAndFetchMoreIfNeeded());
     return axios({
         method: 'put',
         url: "https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/ballots/",
-        data: JSON.stringify({"WinnerID" : winnerID, "LoserID" : loserID}),
+        data: JSON.stringify({"WinnerID" : winnerID, "LoserID" : loserID, "BallotID" : ballotID, "AuthKey": authKey}),
         headers: {"Content-Type": "application/json"}
       }
     )
@@ -97,7 +99,7 @@ const fetchMoreBallots = (count) => {
     var authKey = getState().authkey.key;
     return axios
       .get(
-          "https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/ballots?count=" + parseInt(count) +"&authkey=" + authKey
+          "https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/ballots?&authkey=" + authKey
       )
       .then(function (response) {
         console.log("Fetch response is");
