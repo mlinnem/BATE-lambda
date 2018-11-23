@@ -1,6 +1,8 @@
 var AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-1'});
 
+const crypto = require("crypto");
+
 //var ddb = new AWS.DynamoDB({apiVersion: '2018-10-01'});
 
 var io = new AWS.DynamoDB.DocumentClient();
@@ -10,7 +12,7 @@ exports.handler = (event) => {
 
     console.log("authKey");
     console.log(authKey);
-    createBallots(authKey);
+    return createBallots(authKey);
 }
 
 //--Main--

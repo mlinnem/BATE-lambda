@@ -1,5 +1,5 @@
 
-  const crypto = require("crypto");
+const crypto = require("crypto");
 
 var AWS = require('aws-sdk');
 // Set the region
@@ -36,7 +36,7 @@ exports.handler = (event, context, callback) => {
         "headers": {"Access-Control-Allow-Headers": '*',
                       "Access-Control-Allow-Origin": '*',
                       "Access-Control-Allow-Methods": '*' },
-        "body": {"AuthKey" : id},
+        "body": JSON.stringify({"AuthKey" : id}),
         "isBase64Encoded": false
     };
 

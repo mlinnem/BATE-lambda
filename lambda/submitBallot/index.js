@@ -6,6 +6,8 @@ AWS.config.update({
 
 // Create an SQS service object
 var sqs = new AWS.SQS();
+var ddb = new AWS.DynamoDB({apiVersion: '2018-10-01'});
+var io = new AWS.DynamoDB.DocumentClient();
 
 exports.handler = (event, context, callback) => {
   var data = event.body;
@@ -20,7 +22,7 @@ exports.handler = (event, context, callback) => {
     "winnerID": winnerID,
     "loserID": loserID,
     "ballotID": ballotID
-  }
+  };
 
   var ballot_and_authKey = [ballot, authKey]
 
@@ -28,14 +30,11 @@ exports.handler = (event, context, callback) => {
 }
 
 function submitBallot(ballot_and_authKey, callback) {
-
   return getSessionUsingAuthKey(ballot_and_authKey)
     .then(recordBallotIfValid)
     .then(prepareResponse(callback))
     .catch(logError);
 }
-
-
 
 function getSessionUsingAuthKey(ballot_and_authKey) {
   var authKey = ballot_and_authKey[1];
@@ -46,7 +45,7 @@ function getSessionUsingAuthKey(ballot_and_authKey) {
 function recordBallotIfValid(ballot_and_session) {
   if (isValidBallot(ballot_and_session)) {
     return removeBallotFromSession(ballot_and_session)
-      .then(addBallotToQueueForProcessing(ballot_and_session[0])); //TODO: These can be parallelized later if needed.
+      .then(backend_addBallotToQueueForProcessing(ballot_and_session[0])); //TODO: These can be parallelized later if needed.
   } else {
     Promise.reject();
   }
@@ -72,34 +71,6 @@ function removeBallotFromSession(ballotToRemove, session) {
   }
 }
 
-function addBallotToQueueForProcessing(ballot) {
-  var params = {
-    DelaySeconds: 10,
-    MessageAttributes: {
-      "Winner": {
-        DataType: "Number",
-        StringValue: winnerID.toString()
-      },
-      "Loser": {
-        DataType: "Number",
-        StringValue: loserID.toString()
-      },
-    },
-    MessageBody: "Ballot Submission",
-    QueueUrl: "https://sqs.us-east-1.amazonaws.com/395179212559/BothAreTotallyEnraged_Queue"
-  };
-
-  sqs.sendMessage(params, function(err, data) {
-      if (err) {
-        console.log("Error", err);
-      } else {
-        console.log("Success", data.MessageId);
-        console.log(data);
-      }
-    }
-    //TODO: Should probably return promise instead of above.
-  }
-
   function prepareResponse(callback) {
     return () => {
       var responseBody = {
@@ -122,6 +93,33 @@ function addBallotToQueueForProcessing(ballot) {
 
   //--Backend functions--
 
+  function backend_addBallotToQueueForProcessing(ballot) {
+    var params = {
+      DelaySeconds: 10,
+      MessageAttributes: {
+        "Winner": {
+          DataType: "Number",
+          StringValue: winnerID.toString()
+        },
+        "Loser": {
+          DataType: "Number",
+          StringValue: loserID.toString()
+        },
+      },
+      MessageBody: "Ballot Submission",
+      QueueUrl: "https://sqs.us-east-1.amazonaws.com/395179212559/BothAreTotallyEnraged_Queue"
+    };
+
+    return sqs.sendMessage(params, function(err, data) {
+        if (err) {
+          console.log("Error", err);
+        } else {
+          console.log("Success", data.MessageId);
+          console.log(data);
+        }
+      }
+      //TODO: Should probably return promise instead of above.
+    }
   function backend_getSession(authkey) {
         console.log("Authkey in session");
         console.log(authkey);

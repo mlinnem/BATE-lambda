@@ -93,13 +93,16 @@ function checkNested(obj /*, level1, level2, ... levelN*/) {
   return true;
 }
 
-const fetchMoreBallots = (count) => {
+const fetchMoreBallots = () => {
   return function(dispatch, getState) {
     console.log("In fetch more ballots")
-    var authKey = getState().authkey.key;
+    console.log("state:");
+    var state = getState();
+    console.log(state);
+    var authKey = state.authkey.key;
     return axios
       .get(
-          "https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/ballots?&authkey=" + authKey
+          "https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/ballots?authkey=" + encodeURIComponent(authKey)
       )
       .then(function (response) {
         console.log("Fetch response is");
@@ -126,7 +129,7 @@ const fetchMoreBallotsIfNeeded = () => {
     console.log("IN fetch more ballots if needed");
     if (shouldFetchMoreBallots(getState())) {
       console.log("Fetching more ballots");
-      return dispatch(fetchMoreBallots(10));
+      return dispatch(fetchMoreBallots());
     } else {
       console.log("Not fetching more ballots");
       return Promise.resolve();
@@ -153,14 +156,16 @@ const fetchAuthKey = (count) => {
       .then(function (response) {
         console.log("Fetch AuthKey response is");
         console.log(response);
-        var newBallots = response.data;
-        return dispatch(receiveAuthKey(newBallots));
+        var authKey = response.data.AuthKey;
+        console.log("actual authkey is ");
+        console.log(authKey);
+        return dispatch(receiveAuthKey(authKey));
       }, function (error) {
         console.log(error);
         return dispatch(failReceiveAuthKey());
       });
   }};
-const shouldFetchAuthKey= (state) => {
+const shouldFetchAuthKey = (state) => {
   return state.authKey.key != null;
 }
 const fetchAuthKeyIfNeeded = () => {
@@ -176,9 +181,9 @@ const fetchAuthKeyIfNeeded = () => {
 const requestAuthKey= () => ({
   type: "REQUEST_AUTH_KEY",
 })
-const receiveAuthKey = (authkey) => ({
+const receiveAuthKey = (key) => ({
   type: "RECEIVE_AUTH_KEY",
-  "authkey": authkey
+  "key": key
 })
 const failReceiveAuthKey = () => ({
   type: "FAIL_RECEIVE_AUTH_KEY",
@@ -332,14 +337,16 @@ function ballots(state = {
 function authkey (state = {
   isFetching: false,
   didInvalidate: false,
-  items: []
+  key: null
   }, action) {
   switch (action.type) {
     case 'RECEIVE_AUTH_KEY':
+      console.log("in RECEIVE_AUTH_KEY reducer");
+      console.log(action);
       action.asyncDispatch(fetchBallotsAndAnimalsIfNeeded());
       return Object.assign({}, state, {
         isFetching: false,
-        authKey: action.authKey,
+        key: action.key,
         lastUpdated: action.receivedAt
     });
     case 'REQUEST_AUTH_KEY':
