@@ -1,8 +1,7 @@
 var AWS = require('aws-sdk');
 // Set the region
-AWS.config.update({
-  region: 'US-EAST-1'
-});
+AWS.config.update({region: 'us-east-1'});
+
 
 // Create an SQS service object
 var sqs = new AWS.SQS();
@@ -11,10 +10,11 @@ var io = new AWS.DynamoDB.DocumentClient();
 
 exports.handler = (event, context, callback) => {
   var data = event.body;
+  console.log(data);
   var parsedData = JSON.parse(data);
 
-  var winnerID = parsedData.WinnerID;
-  var loserID = parsedData.LoserID;
+  var winnerID = parseInt(parsedData.WinnerID);
+  var loserID = parseInt(parsedData.LoserID);
   var ballotID = parsedData.BallotID;
   var authKey = parsedData.AuthKey;
 
@@ -25,7 +25,6 @@ exports.handler = (event, context, callback) => {
   };
 
   var ballot_and_authKey = [ballot, authKey]
-
   return submitBallot(ballot_and_authKey, callback);
 }
 
@@ -37,17 +36,24 @@ function submitBallot(ballot_and_authKey, callback) {
 }
 
 function getSessionUsingAuthKey(ballot_and_authKey) {
+  console.log("In getSessionUsingAuthKey");
+  var ballot = ballot_and_authKey[0];
   var authKey = ballot_and_authKey[1];
-  var session = backend_getSession(authKey);
-  return [ballot, session];
+  console.log(authKey);
+  return backend_getSession(authKey)
+  .then((session) => {
+    return [ballot, session]
+  });
 }
 
 function recordBallotIfValid(ballot_and_session) {
+  var ballot = ballot_and_session[0];
   if (isValidBallot(ballot_and_session)) {
     return removeBallotFromSession(ballot_and_session)
-      .then(backend_addBallotToQueueForProcessing(ballot_and_session[0])); //TODO: These can be parallelized later if needed.
+      .then(backend_addBallotToQueueForProcessing(ballot)); //TODO: These can be parallelized later if needed.
   } else {
-    Promise.reject();
+    console.log("THIS AINT NO VALID BALLOT!");
+    Promise.reject(); //Is this right?
   }
 }
 
@@ -67,7 +73,7 @@ function removeBallotFromSession(ballotToRemove, session) {
     session.Items.PendingBallots = shrunkenBallots;
     return [ballotToRemove, session];
   } else {
-    throw error;
+    throw "No ballot with ID " + ballotToRemove.ballotID + " was found in pending ballots for this user.";
   }
 }
 
@@ -99,11 +105,11 @@ function removeBallotFromSession(ballotToRemove, session) {
       MessageAttributes: {
         "Winner": {
           DataType: "Number",
-          StringValue: winnerID.toString()
+          StringValue: ballot.winnerID.toString()
         },
         "Loser": {
           DataType: "Number",
-          StringValue: loserID.toString()
+          StringValue: ballot.loserID.toString()
         },
       },
       MessageBody: "Ballot Submission",
@@ -112,14 +118,15 @@ function removeBallotFromSession(ballotToRemove, session) {
 
     return sqs.sendMessage(params, function(err, data) {
         if (err) {
-          console.log("Error", err);
+          console.log("Error!!", err);
         } else {
-          console.log("Success", data.MessageId);
+          console.log("Success!!", data.MessageId);
           console.log(data);
         }
-      }
+      });
+  }
+
       //TODO: Should probably return promise instead of above.
-    }
   function backend_getSession(authkey) {
         console.log("Authkey in session");
         console.log(authkey);
@@ -153,9 +160,14 @@ function removeBallotFromSession(ballotToRemove, session) {
     var submittedBallot = ballot_and_session[0];
     var session = ballot_and_session[1];
 
-    var submittedBallotID = ballot.ballotID;
+    var submittedBallotID = submittedBallot.ballotID;
 
-    var pendingBallot = session.Items.PendingBallots[submittedBallotID]; //TODO: This will fail if ballot is not legit.
+    console.log("Session is:");
+    console.log(session);
+    console.log("Ballot is:");
+    console.log(submittedBallot);
+
+    var pendingBallot = session.Item.PendingBallots[submittedBallotID]; //TODO: This will fail if ballot is not legit.
     if (pendingBallot != null) {
       return true;
     } else {

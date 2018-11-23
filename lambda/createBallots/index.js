@@ -48,6 +48,7 @@ function generateNewBallotsAndWriteToSession(animals_and_session) {
 
 
 function returnBallots(ballots) {
+    console.log("Outgoing response...");
       const response = {
           "statusCode": 200,
           "isBase64Encoded": false,
@@ -56,6 +57,7 @@ function returnBallots(ballots) {
                     "Access-Control-Allow-Methods": '*' },
           "body": JSON.stringify(ballots),
       };
+      console.log(response);
       return response;
 }
 
@@ -67,7 +69,10 @@ function writeSession(session) {
         TableName: 'AuthKey_To_Ballots'
       };
 
+      console.log("Attempting to write session..., params are");
+      console.log(put_params);
       var request = io.put(put_params);
+
       var promise = request.promise();
       return promise;
 }
@@ -114,15 +119,17 @@ function writeNewBallotsToSession(newBallots, session) {
     console.log("TOP writeNEwBallotsToSession");
     session.Item.PendingBallots = session.Item.PendingBallots.concat(newBallots);
      console.log("UNDER writeNEwBallotsToSession");
+     console.log("Session (pending ballots of) that is about to be written");
+     console.log(session.Item.PendingBallots);
      return writeSession(session);
 }
 
 function generateNewBallots(newBallotsNeeded, animalCount) {
+    var newBallots = [];
         for (var i=0; i < newBallotsNeeded; i++) {
+            console.log("I is " + i);
             var animal_1_num = 0;
             var animal_2_num = 0;
-
-                        var newBallots = [];
             //TODO: This will become a problem if the valid ID list is ever sparse (i.e. we remove an ID).
             animal_1_num = getRandomInt(0, animalCount - 1);
             if (animal_1_num > 0) {
@@ -138,9 +145,11 @@ function generateNewBallots(newBallotsNeeded, animalCount) {
               }
                var ballot = [animal_1_num, animal_2_num];
                const uniqueID = getUniqueID();
-               ballot.concat(uniqueID);
+               ballot = ballot.concat(uniqueID);
 
             newBallots.push(ballot);
+            console.log("New ballots is now");
+            console.log(newBallots);
         }
         return newBallots;
 }
