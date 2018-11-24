@@ -18,29 +18,29 @@ exports.handler = (event) => {
 //--Main--
 
 function createBallots(authKey) {
-    return getAnimalsAndSession(authKey)
-    .then(generateNewBallotsAndWriteToSession)
+    return getAnimalsAndPendingBallots(authKey)
+    .then(generateNewBallotsAndWriteToPendingBallots)
     .then(returnBallots)
     .catch(logError);
 };
 
-function getAnimalsAndSession(authkey) {
-    return Promise.all([getAnimals(), getSession(authkey)]);
+function getAnimalsAndPendingBallots(authkey) {
+    return Promise.all([getAnimals(), getPendingBallots(authkey)]);
 }
 
 
-async function generateNewBallotsAndWriteToSession(animals_and_session) {
-      console.log("generateNewBallotsAndWriteToSession");
-      console.log(animals_and_session);
-      var animals = animals_and_session[0];
-      var session = animals_and_session[1];
+async function generateNewBallotsAndWriteToPendingBallots(animals_and_pendingBallots) {
+      console.log("generateNewBallotsAndWriteToPendingBallots");
+      console.log(animals_and_pendingBallots);
+      var animals = animals_and_pendingBallots[0];
+      var pendingBallots = animals_and_pendingBallots[1];
 
       var animalCount = getAnimalCount(animals);
 
-      var newBallotsNeeded = calculateBallotsToProvide(session);
+      var newBallotsNeeded = calculateBallotsToProvide(pendingBallots);
 
       var newBallots = generateNewBallots(newBallotsNeeded, animalCount);
-      await writeNewBallotsToSession(newBallots, session)
+      await writeNewBallotsToPendingBallots(newBallots);
       .catch(logError);
 
       return newBallots;
@@ -63,19 +63,44 @@ function returnBallots(ballots) {
 
 //--Backend functions--
 
-function writeSession(session) {
-      var put_params = {
-        Item: session.Item,
-        TableName: 'AuthKey_To_Ballots'
-      };
+function batchWritePendingBallots(authKey, pendingBallots) {
+  putRequests = [];
+  for (var pendingBallot of pendingBallots) {
+    var putRequest = {
+      PutRequest: {
+        Item: {
+          SessionID: authKey,
+          PendingBallotID: pendingBallot[2],
+          Animal1ID: pendingBallot[0],
+          Animal2ID: pendingBallot[1],
+          CreatedAt: new Date().getTime()
+        }
+      }
+    };
+    putRequests.push(putRequest);
+  }
 
-      console.log("Attempting to write session..., params are");
-      console.log(put_params);
-      var request = io.put(put_params);
+  var batchWrite_params = {
+  RequestItems: {
+    'PendingBallots': putRequests
+  };
 
-      var promise = request.promise();
-      return promise;
+  return io.batchWrite(batchWrite_params).promise();
 }
+
+// function writeSession(session) {
+//       var put_params = {
+//         Item: session.Item,
+//         TableName: 'AuthKey_To_Ballots'
+//       };
+//
+//       console.log("Attempting to write session..., params are");
+//       console.log(put_params);
+//       var request = io.put(put_params);
+//
+//       var promise = request.promise();
+//       return promise;
+// }
 
 function getAnimals() {
   var get_params = {
@@ -93,35 +118,40 @@ function getAnimals() {
 }
 
 //TODO: Shared with other functions. Should maybe be abstracted out.
-function getSession(authkey) {
-    console.log("Authkey in session");
-    console.log(authkey);
-    var get_params = {
-  Key: {
-   "AuthKey": authkey,
-  },
-  TableName: "AuthKey_To_Ballots"
- };
+// function getSession(authkey) {
+//     console.log("Authkey in session");
+//     console.log(authkey);
+//     var get_params = {
+//   Key: {
+//    "AuthKey": authkey,
+//   },
+//   TableName: "AuthKey_To_Ballots"
+//  };
+//
+//  console.log("Get Session params");
+//  console.log(get_params);
+//  var request = io.get(get_params);
+//  var promise = request.promise();
+//  return promise;
+// }
 
- console.log("Get Session params");
- console.log(get_params);
- var request = io.get(get_params);
- var promise = request.promise();
- return promise;
+function getPendingBallots(authKey) {
+  var get_params = {
+    TableName : 'PendingBallots',
+    Key: {
+      SessionID: authKey
+      }
+  };
+
+  return io.get(get_params).promise();
 }
 
 //--Utility functions--
 
-function writeNewBallotsToSession(newBallots, session) {
+function writeNewBallotsToPendingBallots(newBallots) {
   //TODO: This can maybe occur asynchronously with respect to just returning the ballots to the user.
   //BUT they have to be written before the user tries to submit the ballot, otherwise backend will think it's bogus.
-    ///var updatedSession =  Object.assign({}, session, {"PendingBallots" : session.PendingBallots.concat(newBallots)});
-    console.log("TOP writeNEwBallotsToSession");
-    session.Item.PendingBallots = session.Item.PendingBallots.concat(newBallots);
-     console.log("UNDER writeNEwBallotsToSession");
-     console.log("Session (pending ballots of) that is about to be written");
-     console.log(session.Item.PendingBallots);
-     return writeSession(session);
+     return batchWritePendingBallots(newBallots);
 }
 
 function generateNewBallots(newBallotsNeeded, animalCount) {
