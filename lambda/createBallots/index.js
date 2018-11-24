@@ -28,7 +28,6 @@ function getAnimalsAndPendingBallots(authkey) {
     return Promise.all([getAnimals(), getPendingBallots(authkey)]);
 }
 
-
 async function generateNewBallotsAndWriteToPendingBallots(animals_and_pendingBallots) {
       console.log("generateNewBallotsAndWriteToPendingBallots");
       console.log(animals_and_pendingBallots);
@@ -135,7 +134,7 @@ function getAnimals() {
 //  return promise;
 // }
 
-function getPendingBallots(authKey) {
+function backend_getPendingBallots(authKey) {
   var get_params = {
     TableName : 'PendingBallots',
     Key: {

@@ -21,73 +21,67 @@ exports.handler = (event, context, callback) => {
   var ballot = {
     "winnerID": winnerID,
     "loserID": loserID,
-    "ballotID": ballotID
+    "ID": ballotID
   };
 
   var ballot_and_authKey = [ballot, authKey]
+
   return submitBallot(ballot_and_authKey, callback);
 }
 
 function submitBallot(ballot_and_authKey, callback) {
-  return getSessionUsingAuthKey(ballot_and_authKey)
-    .then(recordBallotIfValid)
+    recordBallotIfValid(ballot_and_authKey)
     .then(prepareResponse(callback))
-    .catch(logError);
+    .catch(handleError); //TODO: Better error message when ballot is bogus?
 }
 
-function getSessionUsingAuthKey(ballot_and_authKey) {
+// function getSessionUsingAuthKey(ballot_and_authKey) {
+//   var ballot = ballot_and_authKey[0];
+//   var authKey = ballot_and_authKey[1];
+//   console.log(authKey);
+//   return backend_getSession(authKey)
+//   .then((session) => {
+//     console.log("GOT SESSION FROM AUTHKEY");
+//     return [ballot, session]
+//   });
+// }
+
+function recordBallotIfValid(ballot_and_authKey) {
+  //TODO: Produce an error if deleting something that doesn't exist using conditional dynamodb crap.
   var ballot = ballot_and_authKey[0];
-  var authKey = ballot_and_authKey[1];
-  console.log(authKey);
-  return backend_getSession(authKey)
-  .then((session) => {
-    console.log("GOT SESSION FROM AUTHKEY");
-    return [ballot, session]
-  });
+  return backend_deletePendingBallot(ballot_and_authKey)
+  .then(backend_addBallotToQueueForProcessing(ballot)); //TODO: These can be parallelized later if needed.
 }
 
-function recordBallotIfValid(ballot_and_session) {
-  console.log("? IS BALLOT VALID ?");
-  var ballot = ballot_and_session[0];
-  if (isValidBallot(ballot_and_session)) {
-    console.log("BALLOT LOOKS VALID");
-    return removeBallotFromSession(ballot_and_session)
-      .then(backend_addBallotToQueueForProcessing(ballot)); //TODO: These can be parallelized later if needed.
-  } else {
-    console.log("THIS AINT NO VALID BALLOT! BAIL");
-    Promise.reject(); //TODO: Is this right?
-  }
-}
+// function removeBallotFromSession(ballotToRemove_and_session) {
+//   console.log("ATTEMPTING TO REMOVE BALLOT FROM SESSION");
+//   var ballotToRemove = ballotToRemove_and_session[0];
+//   console.log("ballotToRemove:");
+//   console.log(ballotToRemove);
+//   var session = ballotToRemove_and_session[1];
+//   console.log("session:");
+//   console.log(session);
+//   var pendingBallots = session.Item.PendingBallots;
+//   var indexToRemove = -1;
+//   for (var i = 0; i < pendingBallots.length; i++) {
+//     var pendingBallot = pendingBallots[i];
+//     if (pendingBallot[2] == ballotToRemove.ballotID) {
+//       indexToRemove = i;
+//     }
+//   }
+//
+//   if (indexToRemove != -1) {
+//     console.log("REMOVING BALLOT FROM SESSION");
+//     pendingBallots.splice(indexToRemove, 1);
+//     var shrunkenBallots = pendingBallots;
+//     session.Item.PendingBallots = shrunkenBallots;
+//     return backend_writeSession(session);
+//   } else {
+//     throw "No ballot with ID " + ballotToRemove.ballotID + " was found in pending ballots for this user.";
+//   }
+// }
 
-function removeBallotFromSession(ballotToRemove_and_session) {
-  console.log("ATTEMPTING TO REMOVE BALLOT FROM SESSION");
-  var ballotToRemove = ballotToRemove_and_session[0];
-  console.log("ballotToRemove:");
-  console.log(ballotToRemove);
-  var session = ballotToRemove_and_session[1];
-  console.log("session:");
-  console.log(session);
-  var pendingBallots = session.Item.PendingBallots;
-  var indexToRemove = -1;
-  for (var i = 0; i < pendingBallots.length; i++) {
-    var pendingBallot = pendingBallots[i];
-    if (pendingBallot[2] == ballotToRemove.ballotID) {
-      indexToRemove = i;
-    }
-  }
-
-  if (indexToRemove != -1) {
-    console.log("REMOVING BALLOT FROM SESSION");
-    pendingBallots.splice(indexToRemove, 1);
-    var shrunkenBallots = pendingBallots;
-    session.Item.PendingBallots = shrunkenBallots;
-    return backend_writeSession(session);
-  } else {
-    throw "No ballot with ID " + ballotToRemove.ballotID + " was found in pending ballots for this user.";
-  }
-}
-
-  function prepareResponse(callback) {
+function prepareResponse(callback) {
     return () => {
       var responseBody = {
         "foo": "bar",
@@ -111,7 +105,7 @@ function removeBallotFromSession(ballotToRemove_and_session) {
 
   function backend_addBallotToQueueForProcessing(ballot) {
     var params = {
-      DelaySeconds: 10,
+      DelaySeconds: 10, //TODO: Why? Lambda delay something?
       MessageAttributes: {
         "Winner": {
           DataType: "Number",
@@ -136,58 +130,72 @@ function removeBallotFromSession(ballotToRemove_and_session) {
       });
   }
 
-      //TODO: Should probably return promise instead of above.
-  function backend_getSession(authkey) {
-        console.log("Authkey in session");
-        console.log(authkey);
-        var get_params = {
-      Key: {
-       "AuthKey": authkey,
+  //     //TODO: Should probably return promise instead of above.
+  // function backend_getSession(authkey) {
+  //       console.log("Authkey in session");
+  //       console.log(authkey);
+  //       var get_params = {
+  //     Key: {
+  //      "AuthKey": authkey,
+  //     },
+  //     TableName: "AuthKey_To_Ballots"
+  //    };
+  //
+  //    console.log("Get Session params");
+  //    console.log(get_params);
+  //    var request = io.get(get_params);
+  //    var promise = request.promise();
+  //    return promise;
+  // }
+
+  function backend_deletePendingBallot(sessionID, submittedBallot) {
+    var delete_params = {
+      "TableName": "PendingBallots",
+      "Key": {
+          "SessionID": sessionID,
+          "PendingBallotID": submittedBallot[2]
       },
-      TableName: "AuthKey_To_Ballots"
-     };
+      "ConditionalExpression" : "attribute_exists(Animal1ID)" //TODO: Is this the right way to do this?
+    };
 
-     console.log("Get Session params");
-     console.log(get_params);
-     var request = io.get(get_params);
-     var promise = request.promise();
-     return promise;
+    return io.delete(delete_params).promise();
   }
 
-  function backend_writeSession(session) {
-          var put_params = {
-            Item: session.Item,
-            TableName: 'AuthKey_To_Ballots'
-          };
-
-          var request = io.put(put_params);
-          var promise = request.promise();
-          return promise;
-  }
+  //
+  // function backend_writeSession(session) {
+  //         var put_params = {
+  //           Item: session.Item,
+  //           TableName: 'AuthKey_To_Ballots'
+  //         };
+  //
+  //         var request = io.put(put_params);
+  //         var promise = request.promise();
+  //         return promise;
+  // }
   //--Utility functions--
 
-  function isValidBallot(ballot_and_session) {
-    var submittedBallot = ballot_and_session[0];
-    var session = ballot_and_session[1];
+  // function isValidBallot(ballot_and_session) {
+  //   var submittedBallot = ballot_and_session[0];
+  //   var session = ballot_and_session[1];
+  //
+  //   var submittedBallotID = submittedBallot.ballotID;
+  //   console.log("submittedBallotID: " + submittedBallotID);
+  //   console.log("session:");
+  //   console.log(session);
+  //   var pendingBallots = session.Item.PendingBallots;
+  //   for (var i = 0; i < pendingBallots.length; i++) {
+  //     var pendingBallot = pendingBallots[i];
+  //     var pendingBallotID = pendingBallot[2];
+  //     console.log("pendingBallotID: " + pendingBallotID);
+  //     if (pendingBallotID == submittedBallotID) {
+  //       console.log("They match!")
+  //       return true;
+  //     }
+  //   }
+  //   console.log("No matches");
+  //   return false;
+  // }
 
-    var submittedBallotID = submittedBallot.ballotID;
-    console.log("submittedBallotID: " + submittedBallotID);
-    console.log("session:");
-    console.log(session);
-    var pendingBallots = session.Item.PendingBallots;
-    for (var i = 0; i < pendingBallots.length; i++) {
-      var pendingBallot = pendingBallots[i];
-      var pendingBallotID = pendingBallot[2];
-      console.log("pendingBallotID: " + pendingBallotID);
-      if (pendingBallotID == submittedBallotID) {
-        console.log("They match!")
-        return true;
-      }
-    }
-    console.log("No matches");
-    return false;
-  }
-
-  function logError(error) {
+  function handleError(error) {
     console.error(error);
   }
