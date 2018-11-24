@@ -54,10 +54,8 @@ const submitBallotAndAdvance = (winnerPlace, loserPlace) => {
     var loserID = state.ballots.items[0][loserPlace];
     var ballotID = state.ballots.items[0][2]; //TODO: This is jank and should be a proper property, not third item in array.
     var authKey = state.authkey.key; //TODO: Need some logic if there is no key. Shouldn't happen but could maybe.
-
-    console.log("winnerID " + winnerID);
-    console.log("loserID " + loserID);
     dispatch(advanceBallotAndFetchMoreIfNeeded());
+    console.log("SUBMITTING BALLOT...");
     return axios({
         method: 'put',
         url: "https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/ballots/",
@@ -66,7 +64,6 @@ const submitBallotAndAdvance = (winnerPlace, loserPlace) => {
       }
     )
     .then(function (response) {
-      console.log("Ballot submission successful");
       dispatch(confirmBallotSubmission());
     }, function (error) {
       console.log(error);
@@ -76,6 +73,7 @@ const submitBallotAndAdvance = (winnerPlace, loserPlace) => {
 }
 const advanceBallotAndFetchMoreIfNeeded = () => {
   return (dispatch, getState) => {
+      console.log("ADVANCING BALLOT");
       dispatch(advanceBallot());
       dispatch(fetchMoreBallotsIfNeeded(getState()));
   };
@@ -95,22 +93,20 @@ function checkNested(obj /*, level1, level2, ... levelN*/) {
 
 const fetchMoreBallots = () => {
   return function(dispatch, getState) {
-    console.log("In fetch more ballots")
-    console.log("state:");
+    console.log("FETCHING MORE BALLOTS");
     var state = getState();
-    console.log(state);
     var authKey = state.authkey.key;
     return axios
       .get(
           "https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/ballots?authkey=" + encodeURIComponent(authKey)
       )
       .then(function (response) {
-        console.log("Fetch response is");
+        console.log("RECEIVED MORE BALLOTS")
+        console.log("response:");
         console.log(response);
         var newBallots = response.data;
         return dispatch(receiveMoreBallots(newBallots));
       }, function (error) {
-        console.log(error);
         return dispatch(failReceiveMoreBallots());
       });
   }};
@@ -118,20 +114,20 @@ const fetchMoreBallots = () => {
 
 const shouldFetchMoreBallots= (state) => {
       if (checkNested(state, "ballots", "items")) {
+        console.log("? FETCH MORE BALLOTS ?");
+        console.log("WE HAVE " + state.ballots.items.length);
         return state.ballots.items.length < 5
       } else {
         return true;
       }
 }
 const fetchMoreBallotsIfNeeded = () => {
-  console.log("Making fetchMoreBallotsIfNeeded");
   return (dispatch, getState) => {
-    console.log("IN fetch more ballots if needed");
     if (shouldFetchMoreBallots(getState())) {
-      console.log("Fetching more ballots");
+      console.log("YES, FETCHING MORE BALLOTS");
       return dispatch(fetchMoreBallots());
     } else {
-      console.log("Not fetching more ballots");
+      console.log("NO, NOT FETCHING MORE BALLOTS");
       return Promise.resolve();
     }
   }
@@ -139,7 +135,6 @@ const fetchMoreBallotsIfNeeded = () => {
 
 const fetchBallotsAndAnimalsIfNeeded = () => {
   return function (dispatch, getState) {
-    console.log("Really in 'fetchBallotsAndAnimalsIfNeeded'");
     store.dispatch(fetchLatestAnimalsIfNeeded());
     store.dispatch(fetchMoreBallotsIfNeeded());
   }
@@ -149,16 +144,16 @@ const fetchBallotsAndAnimalsIfNeeded = () => {
 const fetchAuthKey = (count) => {
   return function(dispatch, getState) {
     dispatch(requestAuthKey());
+    console.log("FETCHING AUTH KEY");
     return axios
       .get(
           "https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/authkey"
       )
       .then(function (response) {
-        console.log("Fetch AuthKey response is");
+        console.log("RECEIVING AUTH KEY");
+        console.log("response:");
         console.log(response);
         var authKey = response.data.AuthKey;
-        console.log("actual authkey is ");
-        console.log(authKey);
         return dispatch(receiveAuthKey(authKey));
       }, function (error) {
         console.log(error);
@@ -203,9 +198,12 @@ const failReceiveLatestAnimals = () => ({
 const fetchLatestAnimals = () => {
   return (dispatch, getState) => {
       dispatch(requestLatestAnimals);
-      console.log("Fetching those animals now");
+      console.log("FETCHING LATEST ANIMALS");
       return axios.get('https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/animals')
       .then(function (response) {
+          console.log("FETCHING ANIMALS SUCCEEDED");
+          console.log("response:");
+          console.log(response);
           var dynamoDBAnimals = response.data.body.Item;
           var allAnimalsGoofy = AWS.DynamoDB.Converter.unmarshall(dynamoDBAnimals);
           var allAnimals = allAnimalsGoofy.Animals;
@@ -293,7 +291,6 @@ function animals(state = {
         didInvalidate: false
       });
     case 'RECEIVE_LATEST_ANIMALS':
-    console.log("Setting animals state...");
       var result =  Object.assign({}, state, {
         isFetching: false,
         didInvalidate: false,
@@ -341,8 +338,6 @@ function authkey (state = {
   }, action) {
   switch (action.type) {
     case 'RECEIVE_AUTH_KEY':
-      console.log("in RECEIVE_AUTH_KEY reducer");
-      console.log(action);
       action.asyncDispatch(fetchBallotsAndAnimalsIfNeeded());
       return Object.assign({}, state, {
         isFetching: false,
@@ -432,8 +427,6 @@ class Animals extends React.Component {
   render () {
     const animals = this.props.animals.items;
     const rankOrder = this.props.animals.rankOrder;
-    console.log("What's the state of animals?");
-    console.log(animals);
     if (animals != null) {
       var animalsHTML = [];
       for (var i = 0; i < rankOrder.length; i++) {
@@ -452,7 +445,6 @@ class Animals extends React.Component {
 }
 class BallotViewer extends React.Component {
   render() {
-    console.log("Rendering ballot viewer");
     if (this.props.animal_1 == null || this.props.animal_2 == null) {
       return "Loading...";
     } else {
@@ -475,7 +467,6 @@ class Animal extends React.Component {
 //--Logical Components--
 
 const animals_mapStateToProps = (state) => {
-  console.log("Mapping state to props for animals");
   return {
     animals: state.animals
   }
@@ -489,10 +480,6 @@ function getCurrentBallotAnimal(firstOrSecond) {
   if (! ballotExists || !animalsExists) {
     return null;
   }
-  console.log("ballots is ");
-  console.log(state.ballots);
-  console.log("Items is");
-  console.log(state.ballots.items);
   var currentBallot = state.ballots.items[0];
   var animalID = currentBallot[firstOrSecond - 1];
   var animal = state.animals.items[animalID];

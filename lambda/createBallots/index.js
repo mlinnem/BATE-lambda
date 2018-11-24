@@ -29,7 +29,7 @@ function getAnimalsAndSession(authkey) {
 }
 
 
-function generateNewBallotsAndWriteToSession(animals_and_session) {
+async function generateNewBallotsAndWriteToSession(animals_and_session) {
       console.log("generateNewBallotsAndWriteToSession");
       console.log(animals_and_session);
       var animals = animals_and_session[0];
@@ -40,7 +40,7 @@ function generateNewBallotsAndWriteToSession(animals_and_session) {
       var newBallotsNeeded = calculateBallotsToProvide(session);
 
       var newBallots = generateNewBallots(newBallotsNeeded, animalCount);
-      writeNewBallotsToSession(newBallots, session)
+      await writeNewBallotsToSession(newBallots, session)
       .catch(logError);
 
       return newBallots;

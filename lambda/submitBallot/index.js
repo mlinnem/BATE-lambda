@@ -36,29 +36,38 @@ function submitBallot(ballot_and_authKey, callback) {
 }
 
 function getSessionUsingAuthKey(ballot_and_authKey) {
-  console.log("In getSessionUsingAuthKey");
   var ballot = ballot_and_authKey[0];
   var authKey = ballot_and_authKey[1];
   console.log(authKey);
   return backend_getSession(authKey)
   .then((session) => {
+    console.log("GOT SESSION FROM AUTHKEY");
     return [ballot, session]
   });
 }
 
 function recordBallotIfValid(ballot_and_session) {
+  console.log("? IS BALLOT VALID ?");
   var ballot = ballot_and_session[0];
   if (isValidBallot(ballot_and_session)) {
+    console.log("BALLOT LOOKS VALID");
     return removeBallotFromSession(ballot_and_session)
       .then(backend_addBallotToQueueForProcessing(ballot)); //TODO: These can be parallelized later if needed.
   } else {
-    console.log("THIS AINT NO VALID BALLOT!");
-    Promise.reject(); //Is this right?
+    console.log("THIS AINT NO VALID BALLOT! BAIL");
+    Promise.reject(); //TODO: Is this right?
   }
 }
 
-function removeBallotFromSession(ballotToRemove, session) {
-  var pendingBallots = session.Items.PendingBallots;
+function removeBallotFromSession(ballotToRemove_and_session) {
+  console.log("ATTEMPTING TO REMOVE BALLOT FROM SESSION");
+  var ballotToRemove = ballotToRemove_and_session[0];
+  console.log("ballotToRemove:");
+  console.log(ballotToRemove);
+  var session = ballotToRemove_and_session[1];
+  console.log("session:");
+  console.log(session);
+  var pendingBallots = session.Item.PendingBallots;
   var indexToRemove = -1;
   for (var i = 0; i < pendingBallots.length; i++) {
     var pendingBallot = pendingBallots[i];
@@ -68,10 +77,11 @@ function removeBallotFromSession(ballotToRemove, session) {
   }
 
   if (indexToRemove != -1) {
+    console.log("REMOVING BALLOT FROM SESSION");
     pendingBallots.splice(indexToRemove, 1);
     var shrunkenBallots = pendingBallots;
-    session.Items.PendingBallots = shrunkenBallots;
-    return [ballotToRemove, session];
+    session.Item.PendingBallots = shrunkenBallots;
+    return backend_writeSession(session);
   } else {
     throw "No ballot with ID " + ballotToRemove.ballotID + " was found in pending ballots for this user.";
   }
@@ -161,18 +171,21 @@ function removeBallotFromSession(ballotToRemove, session) {
     var session = ballot_and_session[1];
 
     var submittedBallotID = submittedBallot.ballotID;
-
-    console.log("Session is:");
+    console.log("submittedBallotID: " + submittedBallotID);
+    console.log("session:");
     console.log(session);
-    console.log("Ballot is:");
-    console.log(submittedBallot);
-
-    var pendingBallot = session.Item.PendingBallots[submittedBallotID]; //TODO: This will fail if ballot is not legit.
-    if (pendingBallot != null) {
-      return true;
-    } else {
-      return false;
+    var pendingBallots = session.Item.PendingBallots;
+    for (var i = 0; i < pendingBallots.length; i++) {
+      var pendingBallot = pendingBallots[i];
+      var pendingBallotID = pendingBallot[2];
+      console.log("pendingBallotID: " + pendingBallotID);
+      if (pendingBallotID == submittedBallotID) {
+        console.log("They match!")
+        return true;
+      }
     }
+    console.log("No matches");
+    return false;
   }
 
   function logError(error) {
