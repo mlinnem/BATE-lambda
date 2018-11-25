@@ -38,30 +38,36 @@ async function confirmAuthKeyIsReal(authKey) {
 }
 
 function getAnimalsAndPendingBallots(authKey) {
-    return Promise.all([getAnimals(), getPendingBallots(authKey)]);
+    return Promise.all([getAnimals(), getPendingBallots(authKey)])
+    .then((result) => {
+         var authKey_and_animals_and_pendingBallots = [authKey, result[0], result[1]]
+        return authKey_and_animals_and_pendingBallots;
+    });
 }
 
 function getPendingBallots(authKey) {
     return backend_getPendingBallots(authKey)
-    .then((pendingBallotsMaybe) => {
-        console.log("pendingBallotsMaybe:");
-        console.log(pendingBallotsMaybe);
-        return pendingBallotsMaybe;
+    .then((pendingBallots) => {
+        console.log("pendingBallots:");
+        console.log(pendingBallots.Items);
+        return pendingBallots.Items;
     });
 }
 
-async function generateNewBallotsAndWriteToPendingBallots(animals_and_pendingBallots) {
+async function generateNewBallotsAndWriteToPendingBallots(authKey_and_animals_and_pendingBallots) {
       console.log("generateNewBallotsAndWriteToPendingBallots");
-      console.log(animals_and_pendingBallots);
-      var animals = animals_and_pendingBallots[0];
-      var pendingBallots = animals_and_pendingBallots[1];
+      console.log(authKey_and_animals_and_pendingBallots);
+
+      var authKey = authKey_and_animals_and_pendingBallots[0];
+      var animals = authKey_and_animals_and_pendingBallots[1];
+      var pendingBallots = authKey_and_animals_and_pendingBallots[2];
 
       var animalCount = getAnimalCount(animals);
 
       var newBallotsNeeded = calculateBallotsToProvide(pendingBallots);
 
       var newBallots = generateNewBallots(newBallotsNeeded, animalCount);
-      await writeNewBallotsToPendingBallots(newBallots)
+      await writeNewBallotsToPendingBallots(authKey, newBallots)
       .catch(logError);
 
       return newBallots;
@@ -207,10 +213,10 @@ function backend_getAuthKey(authKey) {
 
 //--Utility functions--
 
-function writeNewBallotsToPendingBallots(newBallots) {
+function writeNewBallotsToPendingBallots(authKey, newBallots) {
   //TODO: This can maybe occur asynchronously with respect to just returning the ballots to the user.
   //BUT they have to be written before the user tries to submit the ballot, otherwise backend will think it's bogus.
-     return batchWritePendingBallots(newBallots);
+     return batchWritePendingBallots(authKey, newBallots);
 }
 
 function generateNewBallots(newBallotsNeeded, animalCount) {
@@ -247,9 +253,9 @@ function getRandomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function calculateBallotsToProvide(session) {
-  var num = 15 - session.Item.PendingBallots.length
-  console.log("CURRENTLY WAITING ON " + session.Item.PendingBallots.length + " BALLOTS");
+function calculateBallotsToProvide(pendingBallots) {
+  var num = 15 - pendingBallots.length;
+  console.log("CURRENTLY WAITING ON " + pendingBallots.length + " BALLOTS");
   console.log("GENERATING AND SENDING " + num + " NEW ONES");
   return num;
 }
