@@ -3,9 +3,9 @@ AWS.config.update({region: 'us-east-1'});
 
 const crypto = require("crypto");
 
-//var ddb = new AWS.DynamoDB({apiVersion: '2018-10-01'});
+var ddb = new AWS.DynamoDB({apiVersion: '2018-10-01'});
 
-var io = new AWS.DynamoDB.DocumentClient();
+var io = new AWS.DynamoDB.DocumentClient({apiVersion: '2018-10-01'});
 
 exports.handler = (event) => {
     var authKey = event["queryStringParameters"]['authkey'];
@@ -18,14 +18,36 @@ exports.handler = (event) => {
 //--Main--
 
 function createBallots(authKey) {
-    return getAnimalsAndPendingBallots(authKey)
+    return confirmAuthKeyIsReal(authKey)
+    .then(getAnimalsAndPendingBallots)
     .then(generateNewBallotsAndWriteToPendingBallots)
     .then(returnBallots)
     .catch(logError);
 };
 
-function getAnimalsAndPendingBallots(authkey) {
-    return Promise.all([getAnimals(), getPendingBallots(authkey)]);
+async function confirmAuthKeyIsReal(authKey) {
+    var result = await backend_getAuthKey(authKey); //TODO: This could be more efficiently combined with the general read operation. If 0 pendingBallots are returned it's fishy.
+    console.log("result of getAuthKey:");
+    console.log(result);
+    if (result.Items.length == 1) {
+        return authKey;
+    } else {
+        throw "Auth key is a sham! Abort!"; //TODO: This is a signal that tomfoolery is occurring, or code is wrong.
+    }
+
+}
+
+function getAnimalsAndPendingBallots(authKey) {
+    return Promise.all([getAnimals(), getPendingBallots(authKey)]);
+}
+
+function getPendingBallots(authKey) {
+    return backend_getPendingBallots(authKey)
+    .then((pendingBallotsMaybe) => {
+        console.log("pendingBallotsMaybe:");
+        console.log(pendingBallotsMaybe);
+        return pendingBallotsMaybe;
+    });
 }
 
 async function generateNewBallotsAndWriteToPendingBallots(animals_and_pendingBallots) {
@@ -39,7 +61,7 @@ async function generateNewBallotsAndWriteToPendingBallots(animals_and_pendingBal
       var newBallotsNeeded = calculateBallotsToProvide(pendingBallots);
 
       var newBallots = generateNewBallots(newBallotsNeeded, animalCount);
-      await writeNewBallotsToPendingBallots(newBallots);
+      await writeNewBallotsToPendingBallots(newBallots)
       .catch(logError);
 
       return newBallots;
@@ -62,14 +84,15 @@ function returnBallots(ballots) {
 
 //--Backend functions--
 
+const PENDINGBALLOTID_PREFIX = "ballot_"
 function batchWritePendingBallots(authKey, pendingBallots) {
-  putRequests = [];
+  var putRequests = [];
   for (var pendingBallot of pendingBallots) {
     var putRequest = {
       PutRequest: {
         Item: {
           SessionID: authKey,
-          PendingBallotID: pendingBallot[2],
+          PendingBallotID: PENDINGBALLOTID_PREFIX + pendingBallot[2],
           Animal1ID: pendingBallot[0],
           Animal2ID: pendingBallot[1],
           CreatedAt: new Date().getTime()
@@ -80,8 +103,9 @@ function batchWritePendingBallots(authKey, pendingBallots) {
   }
 
   var batchWrite_params = {
-  RequestItems: {
-    'PendingBallots': putRequests
+    RequestItems: {
+        'PendingBallots': putRequests
+    }
   };
 
   return io.batchWrite(batchWrite_params).promise();
@@ -103,7 +127,7 @@ function batchWritePendingBallots(authKey, pendingBallots) {
 
 function getAnimals() {
   var get_params = {
-  Key: {
+  "Key": {
    "ID": "0",
   },
   TableName: "AllAnimals"
@@ -135,14 +159,50 @@ function getAnimals() {
 // }
 
 function backend_getPendingBallots(authKey) {
-  var get_params = {
+    console.log("GETTING PENDING BALLOTS");
+  var query_params = {
     TableName : 'PendingBallots',
-    Key: {
-      SessionID: authKey
-      }
+    KeyConditionExpression : "SessionID = :authKey AND begins_with(PendingBallotID, :pendingBallotID_prefix)",
+    ExpressionAttributeValues : {
+        ":authKey" : authKey,
+        ":pendingBallotID_prefix" : PENDINGBALLOTID_PREFIX
+    }
   };
 
-  return io.get(get_params).promise();
+//   var params = {
+//   RequestItems: {
+//     'PendingBallots': {
+//       Keys: [
+//         {'KEY_NAME': {N: 'KEY_VALUE_1'}},
+//         {'KEY_NAME': {N: 'KEY_VALUE_2'}},
+//         {'KEY_NAME': {N: 'KEY_VALUE_3'}}
+//       ],
+//       ProjectionExpression: 'KEY_NAME, ATTRIBUTE'
+//     }
+//   }
+// };
+
+    console.log("query params:");
+    console.log(query_params);
+
+  return io.query(query_params).promise();
+}
+
+function backend_getAuthKey(authKey) {
+    console.log("GETTING AUTH KEY");
+     var query_params = {
+    TableName : 'PendingBallots',
+    KeyConditionExpression : "SessionID = :authKey AND begins_with(PendingBallotID, :session)",
+    ExpressionAttributeValues : {
+        ":authKey" : authKey,
+        ":session" : "session"
+    }
+  };
+
+
+    console.log("get params:");
+    console.log(query_params);
+    return io.query(query_params).promise();
 }
 
 //--Utility functions--

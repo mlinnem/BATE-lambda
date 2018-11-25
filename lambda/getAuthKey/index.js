@@ -46,26 +46,18 @@ exports.handler = (event, context, callback) => {
 function writeNewAuthKey(id){
  var put_params2 =
  { "Item": {
-  "AuthKey": {
+  "SessionID": {
     "S": id.toString()
   },
-  "PendingBallots": {
-    "L": []
+  "PendingBallotID" : {
+      "S" : "session"
   },
-  "LastUpdated": {
-    "S": new Date().toString()
-  }
+  "CreatedAt" : {
+      "N" : JSON.stringify(new Date().getTime())
+  },
  },
- "TableName" : "AuthKey_To_Ballots"
+ "TableName" : "PendingBallots"
 };
- var put_params =
-  {
-    "Item" : {
-    "AuthKey": id,
-    "PendingBallots": []
-    },
-    "TableName" : "AuthKey_To_Ballots"
-  };
   console.log("put params are");
   console.log(put_params2);
  var request = ddb.putItem(put_params2);
