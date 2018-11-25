@@ -452,13 +452,13 @@ class BallotViewer extends React.Component {
     if (this.props.animal_1 == null || this.props.animal_2 == null) {
       return "Loading...";
     } else {
-      return <div><div onClick={this.props.onBallotClick(0, 1)}>{this.props.animal_1.Name}</div> vs. <div onClick={this.props.onBallotClick(1, 0)}>{this.props.animal_2.Name}</div></div>;
+      return <div><button onClick={this.props.onBallotClick(0, 1)}>{this.props.animal_1.Name}</button> vs. <button onClick={this.props.onBallotClick(1, 0)}>{this.props.animal_2.Name}</button></div>;
     }
   }
 }
 class AnimalListing extends React.Component {
   render () {
-    return <div><Link to={"/animals/" + this.props.rank}>{this.props.rank} - {this.props.name}</Link></div>;
+    return <div>{this.props.rank} - {this.props.name}</div>;
   }
 }
 class Animal extends React.Component {
