@@ -94,6 +94,7 @@ function checkNested(obj /*, level1, level2, ... levelN*/) {
 const fetchMoreBallots = () => {
   return function(dispatch, getState) {
     console.log("FETCHING MORE BALLOTS");
+    dispatch(requestMoreBallots());
     var state = getState();
     var authKey = state.authkey.key;
     return axios
@@ -114,8 +115,11 @@ const fetchMoreBallots = () => {
 
 const shouldFetchMoreBallots= (state) => {
       if (checkNested(state, "ballots", "items")) {
-        console.log("? FETCH MORE BALLOTS ?");
+        console.log("? FETCH MORE BALLOTS zz?");
+        console.log("yo yo yo");
         console.log("WE HAVE " + state.ballots.items.length);
+        console.log("ARE WE CURRENTLY FETCHING?");
+        console.log(state.ballots.isFetching);
         return (state.ballots.items.length <= 5 && state.ballots.isFetching == false)
       } else {
         return true;

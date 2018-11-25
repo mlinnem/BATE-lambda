@@ -9,6 +9,8 @@ var ddb = new AWS.DynamoDB({apiVersion: '2018-10-01'});
 var io = new AWS.DynamoDB.DocumentClient();
 
 exports.handler = (event, context, callback) => {
+  console.log("event:");
+  console.log(event);
   var data = event.body;
   console.log(data);
   var parsedData = JSON.parse(data);
@@ -24,7 +26,7 @@ exports.handler = (event, context, callback) => {
     "ID": ballotID
   };
 
-  var ballot_and_authKey = [ballot, authKey]
+  var ballot_and_authKey = [ballot, authKey];
 
   return submitBallot(ballot_and_authKey, callback);
 }
@@ -104,6 +106,8 @@ function prepareResponse(callback) {
   //--Backend functions--
 
   function backend_addBallotToQueueForProcessing(ballot) {
+    console.log("ADDING BALLOT TO QUEUE FOR PROCESSING");
+    console.log("params:");
     var params = {
       DelaySeconds: 10, //TODO: Why? Lambda delay something?
       MessageAttributes: {
@@ -120,11 +124,12 @@ function prepareResponse(callback) {
       QueueUrl: "https://sqs.us-east-1.amazonaws.com/395179212559/BothAreTotallyEnraged_Queue"
     };
 
+    console.log(params);
     return sqs.sendMessage(params, function(err, data) {
         if (err) {
           console.log("Error!!", err);
         } else {
-          console.log("Success!!", data.MessageId);
+          console.log("Successfully added message to queue", data.MessageId);
           console.log(data);
         }
       });
@@ -148,12 +153,17 @@ function prepareResponse(callback) {
   //    return promise;
   // }
 
-  function backend_deletePendingBallot(sessionID, submittedBallot) {
+  function backend_deletePendingBallot(ballot_and_authKey) {
+    console.log("DELETING SUBMITTED BALLOT FROM PENDING BALLOTS");
+    var submittedBallot = ballot_and_authKey[0];
+    console.log("submittedBallot:");
+    console.log(submittedBallot);
+    var authKey = ballot_and_authKey[1];
     var delete_params = {
       "TableName": "PendingBallots",
       "Key": {
-          "SessionID": sessionID,
-          "PendingBallotID": submittedBallot[2]
+          "SessionID": authKey,
+          "PendingBallotID": submittedBallot.ID
       },
       "ConditionalExpression" : "attribute_exists(Animal1ID)" //TODO: Is this the right way to do this?
     };

@@ -90,7 +90,7 @@ function returnBallots(ballots) {
 
 //--Backend functions--
 
-const PENDINGBALLOTID_PREFIX = "ballot_"
+
 function batchWritePendingBallots(authKey, pendingBallots) {
   var putRequests = [];
   for (var pendingBallot of pendingBallots) {
@@ -98,7 +98,7 @@ function batchWritePendingBallots(authKey, pendingBallots) {
       PutRequest: {
         Item: {
           SessionID: authKey,
-          PendingBallotID: PENDINGBALLOTID_PREFIX + pendingBallot[2],
+          PendingBallotID: pendingBallot[2],
           Animal1ID: pendingBallot[0],
           Animal2ID: pendingBallot[1],
           CreatedAt: new Date().getTime()
@@ -163,6 +163,8 @@ function getAnimals() {
 //  var promise = request.promise();
 //  return promise;
 // }
+
+const PENDINGBALLOTID_PREFIX = "ballot_"
 
 function backend_getPendingBallots(authKey) {
     console.log("GETTING PENDING BALLOTS");
@@ -240,7 +242,7 @@ function generateNewBallots(newBallotsNeeded, animalCount) {
               }
                var ballot = [animal_1_num, animal_2_num];
                const uniqueID = getUniqueID();
-               ballot = ballot.concat(uniqueID);
+               ballot = ballot.concat(PENDINGBALLOTID_PREFIX + uniqueID);
 
             newBallots.push(ballot);
             console.log("New ballots is now");
