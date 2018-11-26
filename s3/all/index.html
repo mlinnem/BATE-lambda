@@ -1,5 +1,5 @@
 <html>
-<header><title>Both Are Totally Enraged</title>
+<head><title>Both Are Totally Enraged</title>
   <script src="https://unpkg.com/react@16/umd/react.development.js"></script>
       <script src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
       <!-- Don't use this in production: -->
@@ -10,6 +10,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/redux/4.0.1/redux.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-redux/5.1.0/react-redux.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/redux-thunk/2.3.0/redux-thunk.js"></script>
+
+<link rel = "stylesheet"
+   type = "text/css"
+   href = "stylesheet.css"/>
+ </head>
 <body>
 <div id="root">
 </div>
@@ -420,13 +425,47 @@ const Prompt =  window.ReactRouterDOM.Prompt;
 const Switch = window.ReactRouterDOM.Switch;
 const Redirect = window.ReactRouterDOM.Redirect;
 
+
+
+//--Presentational Components--
+
 class App extends React.Component {
   render() {
-      return <Router><div><p>Both Are Totally Enraged</p><ul><li><Link to="battle">Battle</Link></li><li><Link to="animals">Rankings</Link></li></ul><Route path="/battle" component={BallotViewer_Logic} /><Route path="/animals" component={Animals_Logic} /></div></Router>;
+      return <div><Header></Header><Contents></Contents></div>;
   }
 }
 
-//--Presentational Components--
+class Header extends React.Component {
+  render () {
+    return <div>Both Are Totally Enraged</div>;
+  }
+}
+
+class Contents extends React.Component {
+  render () {
+    return (
+    <Router>
+    <div>
+      <SubHeader></SubHeader>
+        <Route path="/battle" component={BallotViewer_Logic}/>
+        <Route path="/animals" component={Animals_Logic} />
+    </div>
+    </Router>
+    );
+  }
+}
+
+class SubHeader extends React.Component {
+  render () {
+    return (
+      <ul>
+        <li><Link to="battle">Battle</Link></li>
+        <li><Link to="animals">Rankings</Link></li>
+      </ul>
+    );
+  }
+}
+
 class Animals extends React.Component {
   render () {
     const animals = this.props.animals.items;
@@ -438,9 +477,6 @@ class Animals extends React.Component {
         animalsHTML.push(<AnimalListing key={i} name={animals[animalKey].Name} rank={i+1} id={animalKey}></AnimalListing>);
       }
       return <div> {animalsHTML}
-            <Switch>
-            <Route path='/animals/:rank' component={Animal}/>
-            </Switch>
             </div>;
       } else {
   return <div>Loading...</div>
@@ -450,21 +486,15 @@ class Animals extends React.Component {
 class BallotViewer extends React.Component {
   render() {
     if (this.props.animal_1 == null || this.props.animal_2 == null) {
-      return "Loading...";
+      return
     } else {
-      return <div><button onClick={this.props.onBallotClick(0, 1)}>{this.props.animal_1.Name}</button> vs. <button onClick={this.props.onBallotClick(1, 0)}>{this.props.animal_2.Name}</button></div>;
+      return <div className="ballotViewer"><div className="animal animal_1" onClick={this.props.onBallotClick(0, 1)}>{this.props.animal_1.Name}</div> <div className="vs">vs.</div> <div className="animal animal_2" onClick={this.props.onBallotClick(1, 0)}>{this.props.animal_2.Name}</div></div>;
     }
   }
 }
 class AnimalListing extends React.Component {
   render () {
     return <div>{this.props.rank} - {this.props.name}</div>;
-  }
-}
-class Animal extends React.Component {
-
-  render () {
-    return <div><Link to="/animals">Back to rankings</Link><div>{this.props.name} is ranked: {this.props.match.params.rank}</div></div>
   }
 }
 
@@ -512,7 +542,6 @@ const animal_mapStateToProps = (state, ownProps) => {return {
   name: state.animals[ownProps.id].name,
   rank: ownProps.id
 }};
-const Animal_Logic = ReactRedux.connect (animal_mapStateToProps)(Animal);
 
 const animalListing_mapStateToProps = (state, ownProps) => { return {
     name: state.animals[ownProps.id].name,
