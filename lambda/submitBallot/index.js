@@ -33,6 +33,7 @@ exports.handler = (event, context, callback) => {
 
   return silentlyFailIfOnShadowbanList(ipAddress)
   .then(submitBallot(ballot_and_authKey, callback))
+  .then(doIPBehaviorBookkeeping(ipAddress))
   .catch(handleError);
 }
 
@@ -53,62 +54,45 @@ function submitBallot(ballot_and_authKey, callback) {
     }
 }
 
-function recordBallotIfValid(ballot_and_authKey) {
+function recordBallotIfValid(ballot_and_authKey_and_IP) {
   //TODO: Produce an error if deleting something that doesn't exist using conditional dynamodb crap.
   var ballot = ballot_and_authKey[0];
-  return backend_deletePendingBallot(ballot_and_authKey)
+  return backend_deletePendingBallot(ballot_and_authKey_IP)
   .then(doIPBehaviorBookkeeping)
   .then(backend_addBallotToQueueForProcessing(ballot)); //TODO: These can be parallelized later if needed.
 }
 
-function doIPBehaviorBookkeeping(ballot_and_authKey) {
+function doIPBehaviorBookkeeping(ipAddress) {
+  return (ballot_and_authKey) => {
+      var ballot = ballot_and_authKey[0];
+      return backend_updateWatchlistBookkeeping(ipAddress, isContrarianBallot(ballot))
+      .then(addToShadowbanListIfWarranted);
+  }
+}
 
-  // import boto3
-  // dynamodb = boto3.client('dynamodb')
-  // response = dynamodb.update_item(
-  //     TableName='siteVisits',
-  //     Key={
-  //         'siteUrl':{'S': "https://www.fernandomc.com/"}
-  //     },
-  //     UpdateExpression='SET visits = visits + :inc',
-  //     ExpressionAttributeValues={
-  //         ':inc': {'N': '1'}
-  //     },
-  //     ReturnValues="UPDATED_NEW"
-  // )
-  // print("UPDATING ITEM")
-  // print(response)
+const SHADOWBAN_SUBMISSION_THRESHOLD = 1600
+const ACCEPTABLE_ABANDON_RATE = .8;
+const ACCEPTABLE_CONTRARIAN_RATE = .8;
 
-  var ballot = ballot_and_authKey[0];
+function addToShadowbanListIfWarranted(updateResult) {
+  console.log("updateToIPAddressStuff:");
+  console.log(updateResult);
 
-  var isContrarian = isBallotContrarian(ballot);
-  var contrarianIncrement = 0;
-  var nonContrarianIncrement = 0;
-  if (isContrarian) {
-      contrarianIncrement = 1;
-  } else {
-    nonContrarianIncrement = 1;
+  var submissionCount = 0;
+  var contrarianSubmissions = 0;
+  var nonContrarianSubmissions = 0;
+  var ballotsAbandoned = 0;
+  var ballotsNotAbandoned = 0;
+
+  if (submissionCount > SHADOWBAN_SUBMISSION_THRESHOLD) {
+    var abandonRate = ballotsAbandoned / (ballotsAbandoned + ballotsNotAbandoned);
+    var contrarianRate = contrarianSubmissions / (contrarianSubmissions + nonContrarianSubmissions);
+
+
   }
 
-  //TODO: Need to create table row in the first place if it doesn't exist.
-  
-  var updateParams = {
-    "TableName" : "IPData",
-    "Key" : {
-      "IPAddress" : ipAddress
-    },
-    "UpdateExpression" : 'SET Submissions = Submissions + :s_inc, ContrarianSubmissions = ContrarianSubmissions + :c_inc, NonContrarianSubmissions = NonContrarianSubmissions + :n_inc, BallotsNotAbandoned = BallotsNotAbandoned + :b_inc',
-    "ExpressionAttributeValues" : {"s_inc" : 1, "c_inc" : contrarianIncrement, "n_inc" : nonContrarianIncrement, "b_inc" : 1}
-  }
-  // Add counter to IP address  (IP address -> voteCount)
-  // If not on ban list, but on watch list:
-  //   (On a side process)
-  //   If vote is contrarian, add count to contrarian total for this IP (IP address -> contrarian count)
-  //   If vote is not contrarian, add count to non-contrarian total for this IP (IP address -> non-contrarian count)
-  //   Add a counter to 'ballots not abandoned' for this IP. (IP address -> ballots not abandoned count)
   //   If submissionCount > 1600 && (isContrarian || ballotAbandoner): (IP address -> voteCount, IP address to contrary/not count, IP address -> ballots abandoned vs not)
   //     Add to ban list. (Write to status)
-  return ballot_and_authKey;
 }
 
 function prepareResponse(callback) {
@@ -179,6 +163,31 @@ function prepareResponse(callback) {
     };
 
     return io.delete(delete_params).promise();
+  }
+
+  function backend_updateWatchlistBookkeeping(ipAddress, isContrarian) {
+    var contrarianIncrement = 0;
+    var nonContrarianIncrement = 0;
+    if (isContrarian) {
+        contrarianIncrement = 1;
+    } else {
+      nonContrarianIncrement = 1;
+    }
+
+    //TODO: Need to create table row in the first place if it doesn't exist.
+    //Should work according to dynamodb docs but not certain
+
+    var updateParams = {
+      "TableName" : "IPData",
+      "Key" : {
+        "IPAddress" : ipAddress
+      },
+      "UpdateExpression" : 'SET Submissions = Submissions + :s_inc, ContrarianSubmissions = ContrarianSubmissions + :c_inc, NonContrarianSubmissions = NonContrarianSubmissions + :n_inc, BallotsNotAbandoned = BallotsNotAbandoned + :b_inc',
+      "ExpressionAttributeValues" : {"s_inc" : 1, "c_inc" : contrarianIncrement, "n_inc" : nonContrarianIncrement, "b_inc" : 1}
+      "ReturnValues" : "ALL_NEW"
+      }
+
+    return io.update(updateParams).promise();
   }
 
   //--Utility functions--
