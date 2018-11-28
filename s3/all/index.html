@@ -10,6 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/redux/4.0.1/redux.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-redux/5.1.0/react-redux.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/redux-thunk/2.3.0/redux-thunk.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-pose@4.0.2/lib/index.js"></script>
 
 <link rel = "stylesheet"
    type = "text/css"
@@ -485,11 +486,23 @@ class Animals extends React.Component {
 }
 class BallotViewer extends React.Component {
   render() {
-    if (this.props.animal_1 == null || this.props.animal_2 == null) {
-      return
+    if (this.props.ballots == null) {
+      return <div className="ballotViewer">Loading...</div>
     } else {
-      return <div className="ballotViewer"><div className="animal animal_1" onClick={this.props.onBallotClick(0, 1)}>{this.props.animal_1.Name}</div> <div className="vs">vs.</div> <div className="animal animal_2" onClick={this.props.onBallotClick(1, 0)}>{this.props.animal_2.Name}</div></div>;
+      return <div className="ballotViewer"><AnimalContender onBallotClick=this.props.onBallotClick(0,1)/><div className="vs">vs.</div> <AnimalContender onBallotClick=this.props.onBallotClick(1,0)/>;
     }
+  }
+}
+
+class Ballot extends React.Component {
+  render () {
+    return <div><AnimalContender place=1 id={this.props.animal1ID}/><AnimalContender place=2 id{this.props.animal2ID}</div>
+  }
+}
+
+class AnimalContender extends React.Component {
+  render () {
+    return <div className="animal animal_1" onClick={this.props.onBallotClick}>{this.props.animal_1.Name}</div>
   }
 }
 class AnimalListing extends React.Component {
@@ -506,6 +519,14 @@ const animals_mapStateToProps = (state) => {
   }
 };
 const Animals_Logic = ReactRedux.connect(animals_mapStateToProps)(Animals);
+
+const ballotViewer_mapStateToProps = (state) {
+  return {
+    ballots: state.ballots.items,
+  }
+}
+
+const BallotViewer_View = ReactRedux.connect()(BallotViewer);
 
 function getCurrentBallotAnimal(firstOrSecond) {
   var state = store.getState();
@@ -525,6 +546,7 @@ const ballotViewer_mapStateToProps = state => {return {
     animal_1: getCurrentBallotAnimal(1),
     animal_2: getCurrentBallotAnimal(2)
   }};
+
 const ballotViewer_mapDispatchToProps = (dispatch) => {
   return {
     onBallotClick: (winnerPlace, loserPlace) => {return () => {

@@ -1,3 +1,66 @@
+Verify that submittedBallots are really being recorded.
+
 Need to work on createBallots, specifically writing the new ballots back to the session, and also striking them from the session in the 'submitBallots' function.
 
 Write code to trim old sessions
+
+
+Split up Animals so sort key is animal. Also look into idempotent counters.
+
+Name authkey to sessionID
+
+Put magic numbers into environment variables
+
+
+
+
+When a vote comes in
+  If > 500 votes from this IP:
+    Add to watch list
+
+  If on watch list
+    If more than 80% of ballots are abandoned after watching > 500 transactions:
+      Add to shadowban list
+    If more than 90% of votes are contrarian after watching > 500 transactions:
+      Add to shadowban list
+
+Every 7 days:
+  Clean out IP counts from IPs with activity starting > 7 days ago.
+  Remove entries from watch list that are > 7 days from creation.
+  Remove shadowbans that are > 28 days from creation.
+
+
+On submitBallot:
+  Is on ban list? (IP address -> status):
+    Remove ballot from session but don't put it on the queue
+  Add counter to IP address  (IP address -> voteCount)
+  If not on ban list, but on watch list:
+    (On a side process)
+    If vote is contrarian, add count to contrarian total for this IP (IP address -> contrarian count)
+    If vote is not contrarian, add count to non-contrarian total for this IP (IP address -> non-contrarian count)
+    Add a counter to 'ballots not abandoned' for this IP. (IP address -> ballots not abandoned count)
+    If submissionCount > 1600 && (isContrarian || ballotAbandoner): (IP address -> voteCount, IP address to contrary/not count, IP address -> ballots abandoned vs not)
+      Add to ban list. (Write to status)
+
+
+Every 15 minutes:
+  Clean old sessions
+
+cleanOldSessions:
+  for each session, check if 'last updated' is > 30 minutes old.
+    if it's > 30 minutes old... (Timestamp last edited for ballot.)
+      for each ballot left in the session, add a counter to 'ballots abandoned'. (IP address -> ballots abandoned)
+
+checkOnWatchList:
+checkContrarian:
+
+Table:
+
+IPData
+  Status : (normal, watchlist, shadowbanlist)
+  StatusSetAt: Timestamp
+  submissionCount: N
+  contrarianVoteCount: N
+  nonContrarianVoteCount: N
+  abandonedBallotCount: N
+  notAbandonedBallotCount: N
