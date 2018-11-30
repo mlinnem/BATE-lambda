@@ -42,7 +42,7 @@ exports.handler = async (event, context, callback) => {
   return submitBallot(ipAddress, authKey, ballot);
 }
 
-function submitBallot(ipAddress, authKey, ballot, callback)
+function submitBallot(ipAddress, authKey, ballot, callback) {
   try {
     var ipData = await getIPData(ipAddress);
     if (isShadowBanned(ipData)) {
