@@ -39,22 +39,20 @@ exports.handler = async (event, context, callback) => {
     "ID": ballotID
   };
 
-  var context = {
-    "ballot": ballot,
-    "authKey": authKey,
-    "ipAddress": ipAddress,
-  }
+  return submitBallot(ipAddress, authKey, ballot);
+}
 
+function submitBallot(ipAddress, authKey, ballot, callback)
   try {
     var ipData = await getIPData(ipAddress);
     if (isShadowBanned(ipData)) {
-      return shadowBanResponse();
+      return shadowBanResponse(callback);
     }
 
     await backend_verifyAndDeletePendingBallot(authKey, ballot);
-    await Promise.all([backend_recordBallot(authKey, ballot), updateIPData(ipData, ballot)]);
+    await Promise.all([backend_recordBallot(authKey, ballot), updateIPData(ipData, ballot)]); //TODO: Is await needed here or can we just return?
 
-    return generateStandardSuccessResponse();
+    return generateStandardSuccessResponse(callback);
 
   } catch (error) {
     handleError(error);
@@ -145,18 +143,10 @@ function isShadowBanned(ipData) {
   return ipData.status == SHADOW_BANNED;
 }
 
-function silentlyFailIfOnShadowbanList(ipData) {
-  var status = ipData.status;
-  if (status == SHADOW_BANNED) {
-    throw "Not today buddy. You are shadow banned.";
-  } else {
-    return context;
-  }
-}
-
 function updateIPData(ipData, ballot) {
   return backend_incrementAndGetIPData(context.ipAddress, context.ballot)
     .then((ipData) => {
+      //TODO: These can really be parallelized if we want.
       return addToShadowbanListIfWarranted(ipData);
     });
 }
@@ -227,15 +217,15 @@ function backend_shadowBanIfNeeded(ipData) {
       }
     }
 
-function shadowBanResponse() {
+function shadowBanResponse(callback) {
   sleep(Math.random() * 500);
-  return generateStandardSuccessResponse();
+  return generateStandardSuccessResponse(callback);
 }
 
 
 //--Backend--
 function backend_getIPData(ipAddress) {
-  
+
 }
 
   //--Utility functions--
