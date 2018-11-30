@@ -17,7 +17,7 @@ const CONTRARIAN = "CONTRARIAN";
 var sqs = new AWS.SQS();
 var io = new AWS.DynamoDB.DocumentClient({
 apiVersion: '2018-10-01'
-}));
+});
 
 exports.handler = async (event, context, callback) => {
   console.log("event:");
