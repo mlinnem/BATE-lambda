@@ -4,6 +4,8 @@ Need to work on createBallots, specifically writing the new ballots back to the 
 
 Write code to trim old sessions
 
+Something off with suffix of ballot IDs
+
 
 Split up Animals so sort key is animal. Also look into idempotent counters.
 

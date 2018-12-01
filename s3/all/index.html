@@ -78,23 +78,29 @@ const submitBallotAndAdvance = (winnerSide) => {
   return (dispatch, getState) => {
     console.log("SUBMIT BALLOT AND ADVANCE");
     dispatch(attemptBallotSubmission());
+    console.log("WHY IS THIS NOT BEING SAVED");
     //TODO: Needs tons more validation server side.
     //TODO: Should not let people pick winner and loser. Only VOTE for winner.
     var state = getState();
     var winnerID = null;
     var loserID = null;
+    console.log("state:");
+    console.log(state);
     console.log("ballotIDQueue:");
     console.log(state.ballots.ballotIDQueue);
-    var currentBallot = state.ballots.ballotIDQueue[0];
-
-    var ballotID = currentBallot.ID; //TODO: This is jank and should be a proper property, not third item in array.
+    var currentBallotID = state.ballots.ballotIDQueue[0];
     var authKey = state.authkey.key; //TODO: Need some logic if there is no key. Shouldn't happen but could maybe.
     dispatch(advanceBallotAndFetchMoreIfNeeded());
     console.log("SUBMITTING BALLOT...");
+    var data = JSON.stringify({"WinnerSide" : winnerSide, "BallotID" : currentBallotID, "AuthKey": authKey});
+    console.log("data:");
+    console.log(data);
+    console.log("why no print");
+
     return axios({
         method: 'put',
         url: "https://n6d28h0794.execute-api.us-east-1.amazonaws.com/Production/ballots/",
-        data: JSON.stringify({"WinnerSide" : winnerSide, "BallotID" : ballotID, "AuthKey": authKey}),
+        "data": data,
         headers: {"Content-Type": "application/json"}
       }
     )
@@ -482,7 +488,6 @@ const BallotViewer = ReactRedux.connect(
 )(BallotViewer_View);
 
 const ballot_mapStateToProps= (state, ownProps) => { return {
-  fake : console.log("BALLOT MAPSTATETOPROPS"),
   ballot: state.ballots.ballotStore[ownProps.id],
 }};
 class Ballot_View extends React.Component {
@@ -500,20 +505,20 @@ const Ballot = ReactRedux.connect(
 )(Ballot_View);
 
 const animalContender_mapStateToProps = (state, ownProps) => {return {
-  fake : console.log("ANIMALCONTENDER MAPSTATETOPROPS"),
   animal : state.animals.animalStore[ownProps.id]
 }};
 const animalContender_mapDispatchToProps = (dispatch, ownProps) => {
     return {
       onBallotClick: () => {
           console.log("BALLOT CLICKED");
+          console.log("ownprops");
+          console.log(ownProps);
           dispatch(submitBallotAndAdvance(ownProps.side));
         }
       }
     };
 class AnimalContender_View extends React.Component {
   render () {
-    console.log("ANIMALCONTENDER_VIEW");
     return <div className={this.props.animationState} onClick={this.props.onBallotClick}>{this.props.animal.Name}</div>
   }
 }
@@ -611,8 +616,8 @@ const QUEUE_STATE = {
 }
 
 const SIDE = {
-  FIRST: "LEFT",
-  SECOND: "RIGHT"
+  LEFT: "LEFT",
+  RIGHT: "RIGHT"
 }
 
 ReactDOM.render(
