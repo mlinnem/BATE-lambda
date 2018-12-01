@@ -1,29 +1,29 @@
 <html>
-<head><title>Both Are Totally Enraged</title>
-  <script src="https://unpkg.com/react@16/umd/react.development.js"></script>
-      <script src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
-      <!-- Don't use this in production: -->
-      <script src="https://unpkg.com/babel-standalone@6.15.0/babel.min.js"></script>
-       <script src="https://unpkg.com/react-router-dom/umd/react-router-dom.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/aws-sdk/2.349.0/aws-sdk.js">    </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/redux/4.0.1/redux.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-redux/5.1.0/react-redux.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/redux-thunk/2.3.0/redux-thunk.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/react-pose@4.0.2/lib/index.js"></script>
 
-<link rel = "stylesheet"
-   type = "text/css"
-   href = "stylesheet.css"/>
- </head>
+<head>
+  <title>Both Are Totally Enraged</title>
+  <script src="https://unpkg.com/react@16/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+  <!-- Don't use this in production: -->
+  <script src="https://unpkg.com/babel-standalone@6.15.0/babel.min.js"></script>
+  <script src="https://unpkg.com/react-router-dom/umd/react-router-dom.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aws-sdk/2.349.0/aws-sdk.js"> </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/redux/4.0.1/redux.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-redux/5.1.0/react-redux.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/redux-thunk/2.3.0/redux-thunk.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-pose@4.0.2/lib/index.js"></script>
+
+  <link rel="stylesheet" type="text/css" href="stylesheet.css" />
+</head>
 
 <body>
-<div id="root">
-</div>
+  <div id="root">
+  </div>
 
-<script type="text/babel">
+  <script type="text/babel">
 
-function startup() {
+    function startup() {
   store.dispatch(fetchAuthKeyIfNeeded());
 }
 
@@ -76,15 +76,18 @@ const failReceiveLatestAnimals = () => ({
 
 const submitBallotAndAdvance = (winnerSide) => {
   return (dispatch, getState) => {
+    console.log("SUBMIT BALLOT AND ADVANCE");
     dispatch(attemptBallotSubmission());
     //TODO: Needs tons more validation server side.
     //TODO: Should not let people pick winner and loser. Only VOTE for winner.
     var state = getState();
     var winnerID = null;
     var loserID = null;
+    console.log("ballotIDQueue:");
+    console.log(state.ballots.ballotIDQueue);
     var currentBallot = state.ballots.ballotIDQueue[0];
 
-    var ballotID = state.ballots.ballotIDQueue[0].ID; //TODO: This is jank and should be a proper property, not third item in array.
+    var ballotID = currentBallot.ID; //TODO: This is jank and should be a proper property, not third item in array.
     var authKey = state.authkey.key; //TODO: Need some logic if there is no key. Shouldn't happen but could maybe.
     dispatch(advanceBallotAndFetchMoreIfNeeded());
     console.log("SUBMITTING BALLOT...");
@@ -229,18 +232,17 @@ function animals(state = {
       return state;
   }
 }
-
 function ballots(state = {
   isFetching: false,
   didInvalidate: false,
   ballotIDQueue: [],
   ballotStore: {},
-  outgoingBallot: null,
+  outgoingBallotID: null,
   }, action) {
   switch (action.type) {
     case 'ADVANCE_BALLOT':
 
-      var currentOutgoingID = state.outgoingBallot.BallotID;
+      var currentOutgoingBallotID = state.outgoingBallotID;
       var newIncomingID = state.ballotIDQueue[1];
       var newOutgoingID = state.ballotIDQueue[0];
 
@@ -251,9 +253,11 @@ function ballots(state = {
 
       newState.ballotStore[newIncomingID].QueueState = QUEUE_STATE.INCOMING;
       newState.ballotStore[newOutgoingID].QueueState = QUEUE_STATE.OUTGOING;
-      newState.ballotStore.delete(currentOutBallot);
 
-      newState.outgoingBallot = newOutgoing;
+      if (currentOutgoingBallotID != null) {
+        newState.ballotStore.delete(currentOutgoingBallotID);
+      }
+      newState.outgoingBallot = newOutgoingID;
 
       return newState;
     case 'REQUEST_MORE_BALLOTS':
@@ -262,6 +266,7 @@ function ballots(state = {
         didInvalidate: false
       });
     case 'RECEIVE_MORE_BALLOTS':
+    console.log("RECEIVING MORE BALLOTS");
       return Object.assign({}, state, {
         isFetching: false,
         didInvalidate: false,
@@ -274,20 +279,23 @@ function ballots(state = {
   }
 }
 function _storeAndPrepNewBallots(ballotStore, newBallots) {
+  console.log("STORE AND PREP NEW BALLOTS");
     for (var i = 0; i < newBallots.length; i++) {
       var newBallot = newBallots[i];
       newBallot.QueueState = QUEUE_STATE.HIDDEN; //TODO: Should this be elsewhere
       var newBallotID = newBallot.ID
       ballotStore[newBallotID] = newBallot;
-
-    }
-    return ballotStore;
+  }
+      return ballotStore;
 }
 function _extractBallotIDs(newBallots) {
   console.log("EXTRACTING BALLOT IDS FROM BALLOTS");
   console.log("newBallots:");
   console.log(newBallots);
-  newBallots.map((newBallot) => {return newBallot.BallotID});
+  var newBallotIDs = newBallots.map((newBallot) => {return newBallot.ID});
+  console.log("newBallotIDs:");
+  console.log(newBallotIDs);
+  return newBallotIDs;
 }
 
 function authkey (state = {
@@ -319,7 +327,6 @@ const rootReducer = Redux.combineReducers({
   "ballots": ballots,
   "authkey": authkey
 })
-
 //--Store--
 
 function createThunkMiddleware(extraArgument) {
@@ -440,7 +447,6 @@ class RankedAnimals_View extends React.Component {
   }
 }
 const RankedAnimals = ReactRedux.connect(rankedAnimals_mapStateToProps)(RankedAnimals_View);
-
 const animalListing_mapStateToProps = (state, ownProps) => { return {
     name: state.animals.animalStore[ownProps.id].Name,
     rank: ownProps.id
@@ -458,11 +464,13 @@ const ballotViewer_mapStateToProps = state => {return {
   }};
 class BallotViewer_View extends React.Component {
   render() {
+    console.log("BALLOTVIEWER_VIEW");
     if (this.props.ballotStore == {}) {
       return <div className="ballotViewer">Loading...</div>
     } else {
       var ballots = Object.keys(this.props.ballotStore).map((ballotID) => {
         var ballot = this.props.ballotStore[ballotID];
+        console.log("rendering ballot...");
         return <Ballot key={ballot.ID} id={ballot.ID} animal1ID={ballot.Animal1ID} animal2ID={ballot.Animal2ID} queueState={ballot.QueueState}/>
       });
       return <div className="ballotViewer">{ballots}</div>;
@@ -474,6 +482,7 @@ const BallotViewer = ReactRedux.connect(
 )(BallotViewer_View);
 
 const ballot_mapStateToProps= (state, ownProps) => { return {
+  fake : console.log("BALLOT MAPSTATETOPROPS"),
   ballot: state.ballots.ballotStore[ownProps.id],
 }};
 class Ballot_View extends React.Component {
@@ -491,19 +500,21 @@ const Ballot = ReactRedux.connect(
 )(Ballot_View);
 
 const animalContender_mapStateToProps = (state, ownProps) => {return {
+  fake : console.log("ANIMALCONTENDER MAPSTATETOPROPS"),
   animal : state.animals.animalStore[ownProps.id]
 }};
 const animalContender_mapDispatchToProps = (dispatch, ownProps) => {
     return {
-      onBallotClick: () => {return () => {
+      onBallotClick: () => {
+          console.log("BALLOT CLICKED");
           dispatch(submitBallotAndAdvance(ownProps.side));
         }
       }
-    }
-  };
+    };
 class AnimalContender_View extends React.Component {
   render () {
-    return <div className={this.props.animationState} onClick={this.props.onBallotClick(this.props.side)}>{this.props.animal.Name}</div>
+    console.log("ANIMALCONTENDER_VIEW");
+    return <div className={this.props.animationState} onClick={this.props.onBallotClick}>{this.props.animal.Name}</div>
   }
 }
 const AnimalContender = ReactRedux.connect(
@@ -573,6 +584,7 @@ const shouldFetchMoreBallots= (state) => {
         console.log("yo yo yo");
         console.log("WE HAVE " + state.ballots.ballotIDQueue.length);
         console.log("ARE WE CURRENTLY FETCHING?");
+        console.log("AND DOES THIS PRINT?");
         console.log(state.ballots.isFetching);
         return (state.ballots.ballotIDQueue.length <= 5 && state.ballots.isFetching == false)
       } else {
@@ -613,4 +625,5 @@ startup();
 
 </script>
 </body>
+
 </html>
