@@ -480,8 +480,8 @@ class Ballot_View extends React.Component {
   render () {
     return (
     <div>
-      <AnimalContender id={this.props.ballot.Animal1ID} animationState={this.props.ballot.QueueState + "_left"} side={SIDE.LEFT}/>
-      <AnimalContender id={this.props.ballot.Animal2ID} animationState={this.props.ballot.QueueState + "_right"} side={SIDE.RIGHT}/>
+      <AnimalContender id={this.props.ballot.Animal1ID} animationState={this.props.ballot.QueueState + " left"} side={SIDE.LEFT}/>
+      <AnimalContender id={this.props.ballot.Animal2ID} animationState={this.props.ballot.QueueState + " right"} side={SIDE.RIGHT}/>
     </div>
     );
   }
@@ -593,9 +593,9 @@ function getCurrentBallotAnimal(firstOrSecond) {
 }
 
 const QUEUE_STATE = {
-  HIDDEN : "HIDDEN",
-  INCOMING: "INCOMING",
-  OUTGOING: "OUTGOING"
+  HIDDEN : "hidden",
+  INCOMING: "incoming",
+  OUTGOING: "outgoing"
 }
 
 const SIDE = {

@@ -5,12 +5,16 @@
   position: absolute;
 }
 
-.animal_1 {
-  transform: translate(4vw, 0px)
+.hidden {
+  color: red;
 }
 
-.animal_2 {
-  transform: translate(60vw, 0px)
+.incoming {
+  color: blue;
+}
+
+.outgoing {
+  color: green;
 }
 
 .vs {
