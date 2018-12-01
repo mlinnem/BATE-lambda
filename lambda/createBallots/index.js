@@ -98,9 +98,9 @@ function batchWritePendingBallots(authKey, pendingBallots) {
       PutRequest: {
         Item: {
           SessionID: authKey,
-          PendingBallotID: pendingBallot[2],
-          Animal1ID: pendingBallot[0],
-          Animal2ID: pendingBallot[1],
+          PendingBallotID: pendingBallot.ID,
+          Animal1ID: pendingBallot.Animal1ID,
+          Animal2ID: pendingBallot.Animal2ID,
           CreatedAt: new Date().getTime()
         }
       }
@@ -240,16 +240,15 @@ function generateNewBallots(newBallotsNeeded, animalCount) {
                 animal_1_num = animal_2_num;
                 animal_2_num = temp;
               }
-               var ballot = [animal_1_num, animal_2_num];
-               const uniqueID = getUniqueID();
-               ballot = ballot.concat(PENDINGBALLOTID_PREFIX + uniqueID);
-
-            newBallots.push(ballot);
-            console.log("New ballots is now");
-            console.log(newBallots);
+               var ballot = {"Animal1ID" : animal_1_num, "Animal2ID" : animal_2_num};
+                const uniqueID = getUniqueID();
+               ballot.ID = PENDINGBALLOTID_PREFIX + uniqueID;
+                newBallots.push(ballot);
+                console.log("New ballots is now");
+                console.log(newBallots);
+               }
+                   return newBallots;
         }
-        return newBallots;
-}
 
 function getRandomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;

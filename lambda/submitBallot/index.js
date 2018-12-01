@@ -26,19 +26,18 @@ exports.handler = async (event, context, callback) => {
   var data = event.body;
   var parsedData = JSON.parse(data);
 
-  var winnerID = parseInt(parsedData.WinnerID);
-  var loserID = parseInt(parsedData.LoserID);
+  var winnerSide = parsedData.WinnerSide);
   var ballotID = parsedData.BallotID;
   var authKey = parsedData.AuthKey;
 
   var ipAddress = event['requestContext']['identity']['sourceIp'];
 
   var ballot = {
-    "winnerID": winnerID,
-    "loserID": loserID,
-    "ID": ballotID
+    "WinnerSide": winnerSide,
+    "ID": ballotID,
   };
-
+  //TODO: Work ballot side through UI
+  
   return submitBallot(ipAddress, authKey, ballot);
 }
 
@@ -143,79 +142,6 @@ function isShadowBanned(ipData) {
   return ipData.status == SHADOW_BANNED;
 }
 
-function updateIPData(ipData, ballot) {
-  return backend_incrementAndGetIPData(context.ipAddress, context.ballot)
-    .then((ipData) => {
-      //TODO: These can really be parallelized if we want.
-      return addToShadowbanListIfWarranted(ipData);
-    });
-}
-
-function backend_incrementIPData(ipAddress, isContrarian) {
-  var contrarianIncrement = 0;
-  var nonContrarianIncrement = 0;
-  if (isContrarian) {
-    contrarianIncrement = 1;
-  } else {
-    nonContrarianIncrement = 1;
-  }
-
-  //TODO: Need to create table row in the first place if it doesn't exist.
-  //Should work according to dynamodb docs but not certain
-
-  var updateParams = {
-    "TableName": "IPData",
-    "Key": {
-      "IPAddress": ipAddress
-    },
-    "UpdateExpression": 'SET Submissions = Submissions + :s_inc, ContrarianSubmissions = ContrarianSubmissions + :c_inc, NonContrarianSubmissions = NonContrarianSubmissions + :n_inc, BallotsNotAbandoned = BallotsNotAbandoned + :b_inc',
-    "ExpressionAttributeValues": {
-      "s_inc": 1,
-      "c_inc": contrarianIncrement,
-      "n_inc": nonContrarianIncrement,
-      "b_inc": 1
-    },
-    "ReturnValues": "ALL_NEW"
-  }
-
-  return io.update(updateParams).promise()
-    .then((result) {
-        console.log("result of updated IP data");
-        console.log(result);
-        if (isShadowBanWorthy(result)) {
-          backend_setIPToShadowban(ipAddress);
-        }
-      }
-
-function backend_shadowBanIfNeeded(ipData) {
-      console.log("updateToIPAddressStuff:");
-      console.log(ipData);
-
-      var submissionCount = 0;
-      var contrarianSubmissions = 0;
-      var nonContrarianSubmissions = 0;
-      var ballotsAbandoned = 0;
-      var ballotsNotAbandoned = 0;
-
-      if (submissionCount > SHADOWBAN_SUBMISSION_THRESHOLD) {
-        var abandonRate = ballotsAbandoned / (ballotsAbandoned + ballotsNotAbandoned);
-        var contrarianRate = contrarianSubmissions / (contrarianSubmissions + nonContrarianSubmissions);
-
-        var newStatus = WATCH_LISTED;
-        var reason = null;
-        if (abandonRate > ACCEPTABLE_ABANDON_RATE) {
-          newStatus = SHADOW_BANNED;
-          reason = BALLOT_ABANDONER;
-        } else if (contrarianRate > ACCEPTABLE_CONTRARIAN_RATE) {
-          newStatus = SHADOW_BANNED;
-          reason = CONTRARIAN;
-        }
-
-        if (newStatus == SHADOW_BANNED) {
-          return backend_setIPTOShadowban(ipAddress, reason);
-        }
-      }
-    }
 
 function shadowBanResponse(callback) {
   sleep(Math.random() * 500);

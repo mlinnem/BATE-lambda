@@ -64,3 +64,183 @@ IPData
   nonContrarianVoteCount: N
   abandonedBallotCount: N
   notAbandonedBallotCount: N
+
+
+
+  ================
+
+Summary:
+Only animal panel really needs animal details. They change based on their ballot's state: Are they hiding, on deck, incoming, IN, outgoing, out. Then they die.
+Ballots basically don't change from when they are created. They change based on their ballot queue state.
+
+ballotQueue.
+
+On receiving ballots...
+
+Set  all ballots to "hidden" & trigger "advance"
+
+On "advance" (should be auto-triggered after receiving ballots):
+
+Delete OUT ballot from OUT and from ballotStore.
+Set head ballot (which may be null) to OUT ballot. Set it to "outgoing" animation.
+Remove head ballot from ballotQueue.
+Set new head ballot to "incoming".
+
+
+===
+#1:
+
+"Loading"
+
+#2:
+
+! getAnimals
+! getBallots
+
+<B1 A1 A3> -h
+<B2 A2 A0> -h
+<B3 A0 A2> -h
+<B4 A2 A0> -h
+<B5 A1 A3> -h
+<B6 A0 A2> -h
+<B7 A2 A0> -h
+<B8 A1 A3> -h
+<B9 A1 A3> -h
+<B10 A0 A2> -h
+<B11 A2 A0> -h
+<B12 A3 A2> -h
+<B13 A1 A0> -h
+<B14 A0 A2> -h -OD
+<B15 A0 A2> -h -->in
+
+#3
+
+(Time passes)
+
+<B1 A1 A3> -h
+<B2 A2 A0> -h
+<B3 A0 A2> -h
+<B4 A2 A0> -h
+<B5 A1 A3> -h
+<B6 A0 A2> -h
+<B7 A2 A0> -h
+<B8 A1 A3> -h
+<B9 A1 A3> -h
+<B10 A0 A2> -h
+<B11 A2 A0> -h
+<B12 A3 A2> -h
+<B13 A1 A0> -h
+<B14 A0 A2> -h -OD
+<B15 A0 A2> -h -IN
+
+#4
+
+! VOTE
+
+<B1 A1 A3> -h
+<B2 A2 A0> -h
+<B3 A0 A2> -h
+<B4 A2 A0> -h
+<B5 A1 A3> -h
+<B6 A0 A2> -h
+<B7 A2 A0> -h
+<B8 A1 A3> -h
+<B9 A1 A3> -h
+<B10 A0 A2> -h
+<B11 A2 A0> -h
+<B12 A3 A2> -h
+<B13 A1 A0> -h -OD
+<B14 A0 A2> -h -->in
+<B15 A0 A2> -h ->out
+
+#5
+
+(Time passes)
+
+<B1 A1 A3> -h
+<B2 A2 A0> -h
+<B3 A0 A2> -h
+<B4 A2 A0> -h
+<B5 A1 A3> -h
+<B6 A0 A2> -h
+<B7 A2 A0> -h
+<B8 A1 A3> -h
+<B9 A1 A3> -h
+<B10 A0 A2> -h
+<B11 A2 A0> -h
+<B12 A3 A2> -h
+<B13 A1 A0> -h -OD
+<B14 A0 A2> -h IN
+<B15 A0 A2> -h OUT
+
+#6
+
+#5
+
+(Time passes)
+
+<B1 A1 A3> -h
+<B2 A2 A0> -h
+<B3 A0 A2> -h
+<B4 A2 A0> -h
+<B5 A1 A3> -h
+<B6 A0 A2> -h
+<B7 A2 A0> -h
+<B8 A1 A3> -h
+<B9 A1 A3> -h
+<B10 A0 A2> -h
+<B11 A2 A0> -h
+<B12 A3 A2> -h
+<B13 A1 A0> -h -OD
+<B14 A0 A2> -h IN
+XXXXXXX
+
+...
+
+#18
+
+<B1 A1 A3> -h
+<B2 A2 A0> -h
+<B3 A0 A2> -h
+<B4 A2 A0> -OD
+<B5 A1 A3> IN
+
+#19
+
+! GET BALLOTS
+
+<B20 ...> -h
+<B21 ...> -h
+<B22 ...> -h
+<B23 ...> -h
+<B24 ...> -h
+<B25 ...> -h
+<B26 ...> -h
+<B27 ...> -h
+<B28 ...> -h
+<B29 ...> -h
+<B1 A1 A3> -h
+<B2 A2 A0> -h
+<B3 A0 A2> -h
+<B4 A2 A0> -OD
+<B5 A1 A3> IN
+
+#20
+
+! vote
+
+<B20 ...> -h
+<B21 ...> -h
+<B22 ...> -h
+<B23 ...> -h
+<B24 ...> -h
+<B25 ...> -h
+<B26 ...> -h
+<B27 ...> -h
+<B28 ...> -h
+<B29 ...> -h
+<B1 A1 A3> -h
+<B2 A2 A0> -h
+<B3 A0 A2> -OD
+<B4 A2 A0> -->in
+<B5 A1 A3> -->out
