@@ -49,7 +49,7 @@ const receiveMoreBallots = (ballots) => ({
   ballots: ballots
 });
 const failReceiveMoreBallots = () => ({
-  type: 'FAIL_RECEIVE_MORE_BALLOTS',
+  type: 'FAIL_RECEIVE_MORE_g',
 });
 const requestAuthKey= () => ({
   type: "REQUEST_AUTH_KEY",
@@ -78,16 +78,10 @@ const submitBallotAndAdvance = (winnerSide) => {
   return (dispatch, getState) => {
     console.log("SUBMIT BALLOT AND ADVANCE");
     dispatch(attemptBallotSubmission());
-    console.log("WHY IS THIS NOT BEING SAVED");
     //TODO: Needs tons more validation server side.
-    //TODO: Should not let people pick winner and loser. Only VOTE for winner.
     var state = getState();
     var winnerID = null;
     var loserID = null;
-    console.log("state:");
-    console.log(state);
-    console.log("ballotIDQueue:");
-    console.log(state.ballots.ballotIDQueue);
     var currentBallotID = state.ballots.ballotIDQueue[0];
     var authKey = state.authkey.key; //TODO: Need some logic if there is no key. Shouldn't happen but could maybe.
     dispatch(advanceBallotAndFetchMoreIfNeeded());
@@ -95,7 +89,6 @@ const submitBallotAndAdvance = (winnerSide) => {
     var data = JSON.stringify({"WinnerSide" : winnerSide, "BallotID" : currentBallotID, "AuthKey": authKey});
     console.log("data:");
     console.log(data);
-    console.log("why no print");
 
     return axios({
         method: 'put',
@@ -238,6 +231,7 @@ function animals(state = {
       return state;
   }
 }
+
 function ballots(state = {
   isFetching: false,
   didInvalidate: false,
@@ -247,7 +241,8 @@ function ballots(state = {
   }, action) {
   switch (action.type) {
     case 'ADVANCE_BALLOT':
-
+      console.log("state at top is:");
+      console.log(state);
       var currentOutgoingBallotID = state.outgoingBallotID;
       var newIncomingID = state.ballotIDQueue[1];
       var newOutgoingID = state.ballotIDQueue[0];
@@ -257,14 +252,24 @@ function ballots(state = {
         lastUpdated: action.receivedAt
       });
 
-      newState.ballotStore[newIncomingID].QueueState = QUEUE_STATE.INCOMING;
-      newState.ballotStore[newOutgoingID].QueueState = QUEUE_STATE.OUTGOING;
+      var newBallot1 = Object.assign({}, newState.ballotStore[newIncomingID], {
+        QueueState : QUEUE_STATE.INCOMING,
+      });
+      var newBallot2 = Object.assign({}, newState.ballotStore[newOutgoingID], {
+        QueueState : QUEUE_STATE.OUTGOING,
+      });
 
+      newState.ballotStore[newIncomingID] = newBallot1;
+      newState.ballotStore[newOutgoingID] = newBallot2;
+      
       if (currentOutgoingBallotID != null) {
-        newState.ballotStore.delete(currentOutgoingBallotID);
+        console.log("DELETING BALLOT WITH THE ID " + currentOutgoingBallotID);
+        delete newState.ballotStore[currentOutgoingBallotID];
       }
-      newState.outgoingBallot = newOutgoingID;
-
+      newState.outgoingBallotID = newOutgoingID;
+      console.log("state at bottom is:");
+      console.log(newState);
+      console.log(newState == state);
       return newState;
     case 'REQUEST_MORE_BALLOTS':
       return Object.assign({}, state, {
@@ -285,14 +290,16 @@ function ballots(state = {
   }
 }
 function _storeAndPrepNewBallots(ballotStore, newBallots) {
+  var newBallotStore = Object.assign({}, ballotStore, {
+  }); //TODO: Better way to copy?
   console.log("STORE AND PREP NEW BALLOTS");
     for (var i = 0; i < newBallots.length; i++) {
       var newBallot = newBallots[i];
       newBallot.QueueState = QUEUE_STATE.HIDDEN; //TODO: Should this be elsewhere
       var newBallotID = newBallot.ID
-      ballotStore[newBallotID] = newBallot;
+      newBallotStore[newBallotID] = newBallot;
   }
-      return ballotStore;
+      return newBallotStore;
 }
 function _extractBallotIDs(newBallots) {
   console.log("EXTRACTING BALLOT IDS FROM BALLOTS");
@@ -411,8 +418,7 @@ class Contents extends React.Component {
     <Router>
     <div>
       <SubHeader></SubHeader>
-        <Route path="/battle" component={BallotViewer}/>
-        <Route path="/animals" component={RankedAnimals} />
+        <BallotViewer></BallotViewer>
     </div>
     </Router>
     );
@@ -423,8 +429,6 @@ class SubHeader extends React.Component {
   render () {
     return (
       <ul>
-        <li><Link to="battle">Battle</Link></li>
-        <li><Link to="animals">Rankings</Link></li>
       </ul>
     );
   }
@@ -465,18 +469,22 @@ class AnimalListing_View extends React.Component {
 const AnimalListing = ReactRedux.connect(
   animalListing_mapStateToProps)(AnimalListing_View);
 
-const ballotViewer_mapStateToProps = state => {return {
+const ballotViewer_mapStateToProps = (state) => { return {
+  fake : console.log("ballotViewer_mapStateToProps running"),
     ballotStore: state.ballots.ballotStore,
   }};
 class BallotViewer_View extends React.Component {
   render() {
-    console.log("BALLOTVIEWER_VIEW");
-    if (this.props.ballotStore == {}) {
+    console.log("rendering ballotviewer");
+    console.log("this.props.ballotStore:");
+    console.log(this.props.ballotStore);
+    if (Object.keys(this.props.ballotStore).length == 0) {
+      console.log("...ballots still loading...");
       return <div className="ballotViewer">Loading...</div>
     } else {
+      console.log("Why do I think there's ballots here?");
       var ballots = Object.keys(this.props.ballotStore).map((ballotID) => {
         var ballot = this.props.ballotStore[ballotID];
-        console.log("rendering ballot...");
         return <Ballot key={ballot.ID} id={ballot.ID} animal1ID={ballot.Animal1ID} animal2ID={ballot.Animal2ID} queueState={ballot.QueueState}/>
       });
       return <div className="ballotViewer">{ballots}</div>;
@@ -488,10 +496,18 @@ const BallotViewer = ReactRedux.connect(
 )(BallotViewer_View);
 
 const ballot_mapStateToProps= (state, ownProps) => { return {
+  fake: console.log("ballot_mapStateToProps"),
   ballot: state.ballots.ballotStore[ownProps.id],
 }};
 class Ballot_View extends React.Component {
   render () {
+    console.log("re-rendering ballot");
+
+    if (this.props.ballot == null) {
+      console.log("WEIRD NULL BALLOT");
+      return null;
+    }
+    console.log(this.props.ballot.QueueState);
     return (
     <div>
       <AnimalContender id={this.props.ballot.Animal1ID} animationState={this.props.ballot.QueueState + " left"} side={SIDE.LEFT}/>
@@ -510,9 +526,6 @@ const animalContender_mapStateToProps = (state, ownProps) => {return {
 const animalContender_mapDispatchToProps = (dispatch, ownProps) => {
     return {
       onBallotClick: () => {
-          console.log("BALLOT CLICKED");
-          console.log("ownprops");
-          console.log(ownProps);
           dispatch(submitBallotAndAdvance(ownProps.side));
         }
       }
@@ -541,9 +554,6 @@ function checkNested(obj /*, level1, level2, ... levelN*/) {
   return true;
 }
 function rankAnimals(animalsMap) {
-    console.log("RANK ANIMALS");
-    console.log("animalsMap:");
-    console.log(animalsMap);
     var animalKeys = Object.keys(animalsMap);
     var animals = [];
     for (let animalKey of animalKeys) {
@@ -585,11 +595,8 @@ const shouldFetchLatestAnimals = (state) => {
 }
 const shouldFetchMoreBallots= (state) => {
       if (checkNested(state, "ballots", "ballotStore")) {
-        console.log("? FETCH MORE BALLOTS zz?");
-        console.log("yo yo yo");
+        console.log("? FETCH MORE BALLOTS?");
         console.log("WE HAVE " + state.ballots.ballotIDQueue.length);
-        console.log("ARE WE CURRENTLY FETCHING?");
-        console.log("AND DOES THIS PRINT?");
         console.log(state.ballots.isFetching);
         return (state.ballots.ballotIDQueue.length <= 5 && state.ballots.isFetching == false)
       } else {
