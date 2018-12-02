@@ -92,6 +92,7 @@ function returnBallots(ballots) {
 
 
 function batchWritePendingBallots(authKey, pendingBallots) {
+  console.log("BATCH WIRITNG PENDING BALLOTS");
   var putRequests = [];
   for (var pendingBallot of pendingBallots) {
     var putRequest = {
@@ -114,6 +115,8 @@ function batchWritePendingBallots(authKey, pendingBallots) {
     }
   };
 
+    console.log("batchWrite_params:");
+    console.log(batchWrite_params);
   return io.batchWrite(batchWrite_params).promise();
 }
 

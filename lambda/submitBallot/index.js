@@ -4,13 +4,6 @@ AWS.config.update({
   region: 'us-east-1'
 });
 
-const SHADOW_BANNED = "SHADOW_BANNED";
-const SHADOWBAN_SUBMISSION_THRESHOLD = 800
-const ACCEPTABLE_ABANDON_RATE = .8;
-const ACCEPTABLE_CONTRARIAN_RATE = .8;
-const WATCH_LISTED = "WATCH_LISTED";
-const BALLOT_ABANDONER = "BALLOT_ABANDONER";
-const CONTRARIAN = "CONTRARIAN";
 
 // Create an SQS service object
 
@@ -18,66 +11,94 @@ var sqs = new AWS.SQS();
 var io = new AWS.DynamoDB.DocumentClient({
 apiVersion: '2018-10-01'
 });
+var sns = new AWS.SNS();
 
-exports.handler = async (event, context, callback) => {
+exports.handler = (event, context, callback) => {
   console.log("event:");
   console.log(event);
 
   var data = event.body;
   var parsedData = JSON.parse(data);
 
-  var winnerSide = parsedData.WinnerSide);
-  var ballotID = parsedData.BallotID;
+  var winnerSide = parsedData.WinnerSide;
+  var submittedBallotID = parsedData.BallotID;
   var authKey = parsedData.AuthKey;
 
   var ipAddress = event['requestContext']['identity']['sourceIp'];
 
-  var ballot = {
-    "WinnerSide": winnerSide,
-    "ID": ballotID,
-  };
-  //TODO: Work ballot side through UI
-  
-  return submitBallot(ipAddress, authKey, ballot);
+
+  return submitBallot(ipAddress, authKey, winnerSide, submittedBallotID);
 }
 
-function submitBallot(ipAddress, authKey, ballot, callback) {
+async function submitBallot(ipAddress, authKey, winnerSide, submittedBallotID) {
   try {
-    var ipData = await getIPData(ipAddress);
-    if (isShadowBanned(ipData)) {
-      return shadowBanResponse(callback);
+    console.log("IN SUBMIT BALLOT");
+    var isReallyShadowBanned = await isShadowBanned(ipAddress);
+    console.log("isShadowBanned:");
+    console.log(isReallyShadowBanned);
+    if (isReallyShadowBanned) {
+      console.log("IS SHADOW BANNED");
+      await sleep(Math.random() * 300);
+      return getStandardSuccessResponse();
     }
 
-    await backend_verifyAndDeletePendingBallot(authKey, ballot);
-    await Promise.all([backend_recordBallot(authKey, ballot), updateIPData(ipData, ballot)]); //TODO: Is await needed here or can we just return?
+    console.log("NOT SHADOW BANNED");
 
-    return generateStandardSuccessResponse(callback);
+    // var getOfPendingBallot = await backend_getPendingBallot(authKey, submittedBallotID);
+    // console.log("getOfPendingBallot:");
+    // console.log(getOfPendingBallot);
+    var oldPendingBallot = await backend_verifyDeleteAndGetPendingBallot(authKey, submittedBallotID);
+
+    var [winnerID, loserID] = getWinnerAndLoserIDs(oldPendingBallot, winnerSide);
+    backend_recordBallot(winnerID, loserID);
+
+    return getStandardSuccessResponse();
 
   } catch (error) {
+    console.log("ERROR!!!!");
     handleError(error);
   }
 }
 
 //--Main flow--
 
-function backend_verifyAndDeletePendingBallot(authKey, submittedBallot) {
+function backend_verifyDeleteAndGetPendingBallot(authKey, submittedBallotID) {
   console.log("DELETING SUBMITTED BALLOT FROM PENDING BALLOTS");
-  console.log("submittedBallot:");
-  console.log(submittedBallot);
+  console.log("submittedBallotID:");
+  console.log(submittedBallotID);
 
   var delete_params = {
     "TableName": "PendingBallots",
     "Key": {
       "SessionID": authKey,
-      "PendingBallotID": submittedBallot.ID
+      "PendingBallotID": submittedBallotID
     },
-    "ConditionalExpression": "attribute_exists(Animal1ID)" //TODO: Is this the right way to do this?
+    "ConditionalExpression": "attribute_exists(Animal1ID)",
+    "ReturnValues" : "ALL_OLD" //TODO: Is this the right way to do this?
   };
 
-  return io.delete(delete_params).promise();
+  return io.delete(delete_params).promise()
+  .then((result) => {
+    return result.Attributes;
+  });
 }
 
-function backend_recordBallot(authkey, ballot) {
+function backend_getPendingBallot(authKey, submittedBallotID) {
+  var get_params = {
+    "TableName": "PendingBallots",
+    "Key": {
+      "SessionID": authKey,
+      "PendingBallotID": submittedBallotID
+    },
+  };
+
+  console.log("BACKEND_GETPENDINGBALLOT");
+  console.log("get_params:");
+  console.log(get_params);
+  return io.get(get_params).promise();
+}
+
+function backend_recordBallot(winnerID, loserID) {
   console.log("ADDING BALLOT TO QUEUE FOR PROCESSING");
 
   var params = {
@@ -85,11 +106,11 @@ function backend_recordBallot(authkey, ballot) {
     MessageAttributes: {
       "Winner": {
         DataType: "Number",
-        StringValue: ballot.winnerID.toString()
+        StringValue: winnerID.toString()
       },
       "Loser": {
         DataType: "Number",
-        StringValue: ballot.loserID.toString()
+        StringValue: loserID.toString()
       },
     },
     MessageBody: "Ballot Submission",
@@ -109,8 +130,7 @@ function backend_recordBallot(authkey, ballot) {
   });
 }
 
-function generateStandardSuccessResponse(callback) {
-  return () => {
+function getStandardSuccessResponse() {
     var responseBody = {};
 
     var response = {
@@ -121,41 +141,57 @@ function generateStandardSuccessResponse(callback) {
         "Access-Control-Allow-Methods": '*'
       },
       "body": JSON.stringify(responseBody),
-      "isBase64Encoded": false;
+      "isBase64Encoded": false,
     };
-    callback(null, response);
-  };
+    return response;
 }
 
-//--IP data flow--
-
-function getIPData(ipAddress) {
-  return backend_getIPData(context.ipAddress)
-  .then((response) {
-    console.log("GOT IP DATA RESPONSE");
-    console.log("response:");
-    console.log(response);
-  }
-}
-
-function isShadowBanned(ipData) {
-  return ipData.status == SHADOW_BANNED;
-}
-
-
-function shadowBanResponse(callback) {
-  sleep(Math.random() * 500);
-  return generateStandardSuccessResponse(callback);
-}
-
-
-//--Backend--
 function backend_getIPData(ipAddress) {
+  var get_params = {
+  Key: {
+   "IPAddress": ipAddress
+  },
+  TableName: "IPData"
+ };
 
+ return io.get(get_params).promise();
 }
 
   //--Utility functions--
 
+//TODO: be more clear about pendingBallot, submitted Ballot, etc.
+function getWinnerAndLoserIDs(oldPendingBallot, winnerSide) {
+  var winnerID = null;
+  var loserID = null;
+  console.log("GET WINNER AND LOSER IDS");
+  console.log("oldPendingBallot");
+  console.log(oldPendingBallot);
+  if (winnerSide == "LEFT") {
+    winnerID = oldPendingBallot.Animal1ID;
+    loserID = oldPendingBallot.Animal2ID;
+  } else if (winnerSide == "RIGHT") {
+    winnerID = oldPendingBallot.Animal2ID;
+    loserID = oldPendingBallot.Animal1ID;
+  } else {
+    throw "Invalid side " + winnerSide;
+  }
+
+  return [winnerID, loserID];
+}
+async function isShadowBanned(ipAddress) {
+  console.log("Getting IP Data");
+  var ipData = await backend_getIPData(ipAddress);
+  console.log("Got IP Data:");
+  console.log(ipData);
+  return ((ipData != null) && (ipData.status == "SHADOW_BANNED"));
+}
+function sleep(ms){
+    return new Promise(resolve=>{
+        setTimeout(resolve,ms);
+    });
+}
 function handleError(error) {
+    console.log(error);
     console.error(error);
+
   }
