@@ -261,7 +261,7 @@ function ballots(state = {
 
       newState.ballotStore[newIncomingID] = newBallot1;
       newState.ballotStore[newOutgoingID] = newBallot2;
-      
+
       if (currentOutgoingBallotID != null) {
         console.log("DELETING BALLOT WITH THE ID " + currentOutgoingBallotID);
         delete newState.ballotStore[currentOutgoingBallotID];
@@ -278,13 +278,24 @@ function ballots(state = {
       });
     case 'RECEIVE_MORE_BALLOTS':
     console.log("RECEIVING MORE BALLOTS");
-      return Object.assign({}, state, {
+      var newState = Object.assign({}, state, {
         isFetching: false,
         didInvalidate: false,
         ballotIDQueue: state.ballotIDQueue.concat(_extractBallotIDs(action.ballots)),
         ballotStore: _storeAndPrepNewBallots(state.ballotStore, action.ballots),
         lastUpdated: action.receivedAt
       });
+
+      //--Mark the items in ballot queue with appropriate queueState, if they aren't already.
+      var newIncomingID = newState.ballotIDQueue[0];
+
+      var newBallot1 = Object.assign({}, newState.ballotStore[newIncomingID], {
+        QueueState : QUEUE_STATE.INCOMING,
+      });
+
+      newState.ballotStore[newIncomingID] = newBallot1;
+      return newState;
+
     default:
       return state;
   }
