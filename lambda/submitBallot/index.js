@@ -5,6 +5,7 @@ AWS.config.update({
 });
 
 
+
 // Create an SQS service object
 
 var sqs = new AWS.SQS();
@@ -51,6 +52,11 @@ async function submitBallot(ipAddress, authKey, winnerSide, submittedBallotID) {
 
     var [winnerID, loserID] = getWinnerAndLoserIDs(oldPendingBallot, winnerSide);
     backend_recordBallot(winnerID, loserID);
+
+    var result = await backend_publishBallotSubmission(authKey, ipAddress, winnerID, loserID);
+    console.log("result from sns");
+    console.log(result);
+
 
     return getStandardSuccessResponse();
 
@@ -130,6 +136,23 @@ function backend_recordBallot(winnerID, loserID) {
   });
 }
 
+function backend_publishBallotSubmission(authKey, ipAddress, winnerID, loserID) {
+  var publish_params = {
+  Message: JSON.stringify({"SessionID" : authKey, "IPAddress" : ipAddress, "WinnerID" : winnerID, "LoserID" : loserID}), /* required */
+  TopicArn: 'arn:aws:sns:us-east-1:395179212559:successfulBallotSubmission'
+};
+  return sns.publish(publish_params).promise()
+  .then((result) => {
+    console.log("SNS RESULT:");
+    console.log(result);
+  })
+  .catch((error) => {
+    console.log("SNS SCREWED UP");
+    console.log(error);
+    console.error(error);
+  });
+}
+
 function getStandardSuccessResponse() {
     var responseBody = {};
 
@@ -154,6 +177,7 @@ function backend_getIPData(ipAddress) {
   TableName: "IPData"
  };
 
+  //TODO: Save a bit of performance if we just pass this over the SNS instead of re-grabbing. A little freshness issue but not sure if material.
  return io.get(get_params).promise();
 }
 
