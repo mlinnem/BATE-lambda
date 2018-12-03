@@ -287,6 +287,7 @@ function ballots(state = {
       });
 
       //--Mark the items in ballot queue with appropriate queueState, if they aren't already.
+
       var newIncomingID = newState.ballotIDQueue[0];
 
       var newBallot1 = Object.assign({}, newState.ballotStore[newIncomingID], {
@@ -395,7 +396,6 @@ function createThunkMiddleware(extraArgument) {
     flushQueue();
     return res;
   };
-
 const store = Redux.createStore(rootReducer, Redux.applyMiddleware(createThunkMiddleware(), asyncDispatchMiddleware));
 
 //--Stuff--
@@ -410,6 +410,12 @@ const Redirect = window.ReactRouterDOM.Redirect;
 
 
 //--Components--
+
+const Box = PoseGroupzz.div({
+  hidden: { x: -1000 },
+  incoming: { x: 0 },
+  outgoing: {x: -1000}
+});
 
 class App extends React.Component {
   render() {
@@ -543,7 +549,7 @@ const animalContender_mapDispatchToProps = (dispatch, ownProps) => {
     };
 class AnimalContender_View extends React.Component {
   render () {
-    return <div className={this.props.animationState} onClick={this.props.onBallotClick}>{this.props.animal.Name}</div>
+    return <div className={this.props.animationState + " animal box"} pose={this.props.animationState} onClick={this.props.onBallotClick}>{this.props.animal.Name}</div>
   }
 }
 const AnimalContender = ReactRedux.connect(
